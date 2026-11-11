@@ -3,7 +3,7 @@
 (function () {
 'use strict';
 
-var VERSION = '1.3.0';
+var VERSION = '1.4.0';
 var CFG = window.APP_CONFIG || {};
 var YEAR = new Date().getFullYear();
 var STYLE_ORDER = ['tinto', 'branco', 'rosé', 'espumante', 'doce/fortificado'];
@@ -60,6 +60,7 @@ var I = {
   edit: svg('<path d="M4 20h4L19.5 8.5l-4-4L4 16z"/>'),
   wifi: svg('<path d="M3 3l18 18M8.5 16.5a5 5 0 0 1 7 0M5 12.6a10 10 0 0 1 4.3-2.4M15.4 10.4A10 10 0 0 1 19 12.6M2 9a14 14 0 0 1 3.3-2.3M12 20h.01"/>'),
   check: svg('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+  ext: svg('<path d="M9 6h9v9M18 6L7 17"/>'),
   undo: svg('<path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/>')
 };
 
@@ -85,6 +86,9 @@ var MSG = {
   sem_permissao: 'Seu acesso não permite editar este item.',
   produto_inexistente: 'Este item não foi encontrado.',
   campo_nao_permitido: 'Campo não permitido.',
+  noticia_invalida: 'Informe título, fonte e um link que comece com http.',
+  noticia_inexistente: 'Essa notícia não existe mais. Atualize os dados.',
+  sugestoes_invalidas: 'Arquivo inválido. Use o arquivo de sugestões (.json).',
   same_password: 'A nova senha precisa ser diferente da atual.',
   reauthentication_needed: 'Por segurança, saia e entre de novo antes de trocar a senha.',
   email_not_confirmed: 'Este e-mail ainda não foi confirmado. Fale com quem administra a sua adega.'
@@ -201,7 +205,7 @@ var S = {
         offline: !navigator.onLine, syncedAt: null, syncing: false, bootErr: null, loadingAdega: false },
   modal: null, busy: null, ficha: {}
 };
-var D = { produtos: new Map(), garrafas: new Map(), locais: new Map(), movs: [], alts: [], nomes: new Map(), membros: [], fotos: {} };
+var D = { produtos: new Map(), garrafas: new Map(), locais: new Map(), movs: [], alts: [], nomes: new Map(), membros: [], fotos: {}, noticias: [] };
 var X = { byP: new Map(), adega: [], bar: [] };
 
 function adegaAtual() { for (var i = 0; i < S.adegas.length; i++) if (S.adegas[i].id === S.adegaId) return S.adegas[i]; return null; }
@@ -226,6 +230,46 @@ function derive() {
   X = { byP: byP, adega: ad, bar: br };
 }
 function stock(id) { return X.byP.get(id) || []; }
+function hayOf(id) {
+  if (!X.hay) X.hay = new Map();
+  var h = X.hay.get(id);
+  if (h == null) { var p = prod(id); h = ' ' + normT([p.nome, p.produtor, p.regiao, p.pais].join(' | ')) + ' '; X.hay.set(id, h); }
+  return h;
+}
+// compara por palavras inteiras, sem acento nem pontuação: "Saint-Julien" acha "Saint Julien"; "Port" não acha "Portugal"
+function normT(s) { return norm(s).replace(/[^a-z0-9]+/g, ' ').trim(); }
+function parseTermos(s) { return String(s || '').split(/[,;\n]/).map(function (t) { return t.trim(); }).filter(Boolean); }
+function ligacao(termos) {
+  var best = null, all = X.adega.concat(X.bar);
+  (termos || []).forEach(function (t) {
+    var nt = normT(t); if (!nt) return;
+    var ids = all.filter(function (id) { return hayOf(id).indexOf(' ' + nt + ' ') >= 0; });
+    if (!ids.length) return;
+    var n = countB(ids);
+    if (!best || n > best.n) best = { termo: t, ids: ids, n: n };
+  });
+  return best;
+}
+function ordenaNoticias(arr) {
+  return arr.slice().sort(function (a, b) { return String(b.publicada_em || '').localeCompare(String(a.publicada_em || '')) || String(b.criado_em || '').localeCompare(String(a.criado_em || '')); });
+}
+function noticiasDaAdega() {
+  if (X.nd) return X.nd;
+  var out = [];
+  D.noticias.forEach(function (n) {
+    if (n.status !== 'publicada') return;
+    var l = ligacao(n.termos);
+    if (l || !(n.termos && n.termos.length)) out.push({ n: n, l: l });
+  });
+  X.nd = out;
+  return out;
+}
+function urlOk(u) { return /^https?:\/\//i.test(String(u || '').trim()); }
+function fmtDia(s) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ''); if (!m) return '';
+  var o = { day: 'numeric', month: 'short' }; if (+m[1] !== new Date().getFullYear()) o.year = 'numeric';
+  return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('pt-BR', o).replace(/\./g, '');
+}
 function countB(ids) { var n = 0; for (var i = 0; i < ids.length; i++) n += stock(ids[i]).length; return n; }
 function prod(id) { return D.produtos.get(id); }
 function locOf(g) { return g && g.local_id ? D.locais.get(g.local_id) : null; }
@@ -408,7 +452,7 @@ if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (P
 var WIDE = window.matchMedia ? window.matchMedia('(min-width: 960px)') : null;
 function isWide() { return !!(WIDE && WIDE.matches); }
 if (WIDE && WIDE.addEventListener) WIDE.addEventListener('change', function () { render(); });
-var DEPTH = { home: 0, vinhos: 0, bar: 0, painel: 0, grupo: 1, busca: 1, historico: 1, vinho: 2 };
+var DEPTH = { home: 0, vinhos: 0, bar: 0, painel: 0, grupo: 1, busca: 1, historico: 1, noticias: 1, vinho: 2 };
 function parseHash() {
   var h = location.hash.replace(/^#\/?/, '');
   var parts = h ? h.split('/').map(function (x) { try { return decodeURIComponent(x); } catch (e) { return x; } }) : [];
@@ -418,6 +462,7 @@ function parseHash() {
     case 'painel': return { name: 'painel' };
     case 'busca': return { name: 'busca' };
     case 'historico': return { name: 'historico' };
+    case 'noticias': return { name: 'noticias' };
     case 'g': return { name: 'grupo', modo: parts[1] || 'pais', chave: parts.slice(2).join('/'), secao: parts[1] === 'cat' ? 'bar' : null };
     case 'b': return { name: 'grupo', modo: parts[1] || 'cat', chave: parts.slice(2).join('/'), secao: 'bar' };
     case 'v': return { name: 'vinho', id: parts[1] };
@@ -590,6 +635,7 @@ var PCOLS = 'id,tipo,secao,categoria,nome,produtor,pais,regiao,estilo,safra,sem_
 var GCOLS = 'id,produto_id,local_id,status,observacao,preco_pago,preco_moeda';
 var MCOLS = 'id,garrafa_id,tipo,de_local_id,para_local_id,ocorrido_em,criado_em,ocasiao,com_quem,nota,usuario_id';
 var ACOLS = 'id,produto_id,campos,antes,depois,usuario_id,criado_em';
+var NCOLS = 'id,titulo,resumo,fonte,url,publicada_em,termos,status,criado_em,motivo';
 function cacheKey(k) { return 'adega.cache.v1.' + (S.me ? S.me.id : 'x') + '.' + k; }
 function applyAdegaData(o) {
   D.produtos = new Map(o.produtos.map(function (p) { return [p.id, p]; }));
@@ -598,11 +644,12 @@ function applyAdegaData(o) {
   D.movs = o.movs || []; D.alts = o.alts || [];
   D.nomes = new Map((o.nomes || []).map(function (n) { return [n.id, n.nome]; }));
   D.membros = o.membros || [];
+  D.noticias = ordenaNoticias(o.noticias || []);
   derive();
 }
 function snapshot() {
   store(cacheKey(S.adegaId), { at: S.ui.syncedAt, produtos: Array.from(D.produtos.values()), garrafas: Array.from(D.garrafas.values()), locais: Array.from(D.locais.values()),
-    movs: D.movs, alts: D.alts, nomes: Array.from(D.nomes, function (e) { return { id: e[0], nome: e[1] }; }), membros: D.membros });
+    movs: D.movs, alts: D.alts, nomes: Array.from(D.nomes, function (e) { return { id: e[0], nome: e[1] }; }), membros: D.membros, noticias: D.noticias });
   store(cacheKey('meta'), { me: S.me, adegas: S.adegas, adegaId: S.adegaId });
 }
 function loadMe() {
@@ -628,10 +675,12 @@ function loadAdega(id) {
     API.select('movimentos', 'select=' + MCOLS + '&' + q + '&order=criado_em.desc&limit=400'),
     API.select('alteracoes', 'select=' + ACOLS + '&' + q + '&order=criado_em.desc&limit=150'),
     API.rpc('nomes_da_adega', { a: id }),
-    API.select('membros', 'select=user_id,papel,nome_exibicao&' + q)
+    API.select('membros', 'select=user_id,papel,nome_exibicao&' + q),
+    // enquanto a tabela de notícias não existir no banco, o app segue sem a seção
+    API.select('noticias', 'select=' + NCOLS + '&order=publicada_em.desc&limit=200').catch(function (e) { if (e.kind === 'rede' || e.kind === 'sessao') throw e; return []; })
   ]).then(function (r) {
     if (id !== S.adegaId) return;
-    applyAdegaData({ produtos: r[0], garrafas: r[1], locais: r[2], movs: r[3], alts: r[4], nomes: r[5], membros: r[6] });
+    applyAdegaData({ produtos: r[0], garrafas: r[1], locais: r[2], movs: r[3], alts: r[4], nomes: r[5], membros: r[6], noticias: r[7] });
     S.ui.syncedAt = new Date().toISOString(); S.ui.offline = false;
     snapshot();
     signPhotos();
@@ -681,7 +730,7 @@ function toLogin(msg) {
   S.phase = 'login'; S.me = null; S.adegas = []; S.adegaId = null; S.ui.loginErr = msg || null; S.ui.loginBusy = false;
   S.modal = null; closeLayerNow();
   if (history.state && history.state.modal) { try { history.replaceState(null, ''); } catch (e) {} }
-  D = { produtos: new Map(), garrafas: new Map(), locais: new Map(), movs: [], alts: [], nomes: new Map(), membros: [], fotos: {} };
+  D = { produtos: new Map(), garrafas: new Map(), locais: new Map(), movs: [], alts: [], nomes: new Map(), membros: [], fotos: {}, noticias: [] };
   S.ficha = {}; S.ui.chips = {}; S.ui.q = ''; S.navDepth = 0;
   derive();
   transition('fade', render);
@@ -708,7 +757,7 @@ function switchAdega(id) {
     S.adegaId = id; PREF.adega = PREF.adega || {}; PREF.adega[S.me.id] = id; savePref();
     var snap = store(cacheKey(id));
     S.ui.loadingAdega = !snap; S.ficha = {}; S.ui.chips = {}; S.navDepth = 0;
-    applyAdegaData(snap || { produtos: [], garrafas: [], locais: [], movs: [], alts: [], nomes: [], membros: [] });
+    applyAdegaData(snap || { produtos: [], garrafas: [], locais: [], movs: [], alts: [], nomes: [], membros: [], noticias: D.noticias });
     if (snap) S.ui.syncedAt = snap.at;
     if (!sameHash('#/')) { navIntent = 'tab'; location.replace('#/'); }
     else transition('fade', function () { closeLayerNow(); render(); window.scrollTo(0, 0); }, true);
@@ -802,7 +851,9 @@ function viewHome() {
     ex('avaliacao', 'Avaliação', plural(avals, 'nível', 'níveis')) + ex('local', 'Local', plural(locais, 'local', 'locais')) + '</div></section>' : '';
   var feed = feedItems(D.movs, []).filter(function (it) { return !it.legado; }).slice(0, 3);
   var movs = feed.length ? '<section class="hsec"><h2>Últimos movimentos<a class="link" href="#/historico">Histórico</a></h2><div class="feed">' + feedHtml(feed, true) + '</div></section>' : '';
-  return head + '<main class="wrap content home">' + hero + stats + '<div class="hcols">' + explorar + movs + '</div></main>';
+  var nd = noticiasDaAdega();
+  var news = nd.length ? '<section class="hsec hnews"><h2>Do mundo do vinho' + (nd.length > 3 || (S.me && S.me.is_admin) ? '<a class="link" href="#/noticias">Ver todas</a>' : '') + '</h2><p class="nsub">Ligado ao que está ' + (S.me && S.me.is_admin ? 'nesta adega' : 'na sua adega') + '</p><div class="nlist">' + nd.slice(0, 3).map(function (o) { return newsCard(o); }).join('') + '</div></section>' : '';
+  return head + '<main class="wrap content home">' + hero + stats + '<div class="hcols">' + explorar + movs + '</div>' + news + '</main>';
 }
 function viewVinhos() {
   var head = topBar(btnMenu(), 'Vinhos', plural(countB(X.adega), 'garrafa', 'garrafas') + ' · ' + plural(X.adega.length, 'rótulo', 'rótulos'), btnSearch(), true);
@@ -1144,6 +1195,46 @@ function viewPainel() {
     '<section class="panel"><h2>Últimos consumos<a class="link" href="#/historico">Ver histórico</a></h2>' + (cons.length ? '<div class="feed">' + feedHtml(cons, true) + '</div>' : '<p class="hint">Nenhum consumo registrado ainda. Na ficha de um vinho, toque em “Abrir uma garrafa”.</p>') + '</section>' +
     '<p class="hint" style="padding:16px 2px 0">Dados de ' + (S.ui.syncedAt ? fmtDate(S.ui.syncedAt) + ', ' + fmtTime(S.ui.syncedAt) : '—') + '.</p></main>';
 }
+function newsCard(o, adm) {
+  var n = o.n, l = o.l, onde = S.me && S.me.is_admin ? 'Nesta adega' : 'Na sua adega', liga = '';
+  if (l) {
+    var one = l.ids.length === 1 ? prod(l.ids[0]) : null;
+    liga = one
+      ? '<a class="nliga" href="#/v/' + one.id + '">' + I.glass + '<span>' + onde + ': <b>' + esc(one.nome) + (safra(one) ? ' ' + esc(safra(one)) : '') + '</b> · ' + plural(l.n, 'garrafa', 'garrafas') + '</span></a>'
+      : '<a class="nliga" href="#/busca" data-a="tryq" data-x="' + esc(l.termo) + '">' + I.glass + '<span>' + onde + ': <b>' + esc(l.termo) + '</b> · ' + plural(l.ids.length, 'rótulo', 'rótulos') + ', ' + plural(l.n, 'garrafa', 'garrafas') + '</span></a>';
+  } else if (adm && n.termos && n.termos.length) liga = '<span class="nliga off">Sem rótulo ligado nesta adega</span>';
+  var dia = fmtDia(n.publicada_em);
+  return '<article class="news" data-k="n:' + esc(n.id) + '"><span class="src">' + esc(n.fonte) + (dia ? ' · ' + esc(dia) : '') + '</span>' +
+    '<h3>' + (urlOk(n.url) ? '<a href="' + esc(n.url) + '" target="_blank" rel="noopener noreferrer">' + esc(n.titulo) + I.ext + '</a>' : esc(n.titulo)) + '</h3>' +
+    (n.resumo ? '<p>' + esc(n.resumo) + '</p>' : '') + liga +
+    (adm && n.status !== 'publicada' && n.motivo ? '<p class="nmot"><b>Por que sugeri:</b> ' + esc(n.motivo) + '</p>' : '') +
+    (adm ? '<div class="nadm"><span class="ntag' + (n.status === 'publicada' ? ' on' : '') + '">' + (n.status === 'publicada' ? 'Publicada' : 'Sugestão') + '</span><span class="hint">' + esc(n.termos && n.termos.length ? n.termos.join(', ') : 'todas as adegas') + '</span>' + (n.status === 'publicada' ? '<button class="link" type="button" data-a="noticia" data-x="' + esc(n.id) + '">Editar</button>' : '') + '</div>' : '') +
+    (adm && n.status !== 'publicada' ? '<div class="nact"><button class="btn small primary" type="button" data-a="pubnoticia" data-x="' + esc(n.id) + '"' + (S.busy ? ' disabled' : '') + '>' + (S.busy === 'pub:' + n.id ? '<span class="spin" aria-hidden="true"></span>' : I.check) + 'Publicar</button><button class="btn small" type="button" data-a="noticia" data-x="' + esc(n.id) + '">Editar</button><button class="btn small danger" type="button" data-a="delnoticia" data-x="' + esc(n.id) + '">Descartar</button></div>' : '') +
+    '</article>';
+}
+function viewNoticias() {
+  var adm = !!(S.me && S.me.is_admin);
+  var head = topBar(btnBack('#/'), 'Do mundo do vinho', (adegaAtual() || {}).nome, '', true);
+  if (!adm) {
+    var vis = noticiasDaAdega();
+    return head + '<main class="wrap content">' + (vis.length ? '<div class="nlist" style="margin-top:14px">' + vis.map(function (o) { return newsCard(o); }).join('') + '</div><p class="hint" style="padding:18px 2px 0">Notícias escolhidas pela administração, ligadas aos rótulos desta adega. O título abre a matéria na fonte.</p>'
+      : emptyState('Nenhuma notícia por enquanto', 'Quando sair algo sobre os vinhos desta adega, aparece aqui.')) + '</main>';
+  }
+  var card = function (n) { return newsCard({ n: n, l: ligacao(n.termos) }, true); };
+  var ras = D.noticias.filter(function (n) { return n.status !== 'publicada'; }), pub = D.noticias.filter(function (n) { return n.status === 'publicada'; });
+  var imp = S.busy === 'sugestoes';
+  var novo = '<div class="nbtns"><label class="btn small' + (imp ? '' : ' primary') + '" for="f-sug"' + (imp ? ' style="opacity:.6;pointer-events:none"' : '') + '>' + (imp ? '<span class="spin" aria-hidden="true"></span>Importando…' : 'Importar sugestões') + '</label><input id="f-sug" class="sr" type="file" accept=".json,application/json">' +
+    '<button class="btn small" type="button" data-a="noticia" data-x="">' + I.plus + 'Nova notícia</button></div>';
+  if (!D.noticias.length) return head + '<main class="wrap content">' + emptyState('Nenhuma notícia ainda', 'Importe o arquivo de sugestões: cada uma chega pronta, com fonte, link e a relação com a adega. Você confere e publica as que fizerem sentido.', novo) + '</main>';
+  return head + '<main class="wrap content"><div class="nbar">' + novo + '<p class="note">Só você vê as sugestões. Cada notícia publicada aparece nas adegas que têm rótulo ligado a ela.</p></div>' +
+    (ras.length ? '<p class="sect-label">Para aprovar · ' + ras.length + '</p><div class="nlist">' + ras.map(card).join('') + '</div>' : '') +
+    (pub.length ? '<p class="sect-label">Publicadas · ' + pub.length + '</p><div class="nlist">' + pub.map(card).join('') + '</div>' : '') + '</main>';
+}
+function ligaTxt(s) {
+  var ts = parseTermos(s);
+  if (!ts.length) return 'Sem termos, a notícia aparece em todas as adegas.';
+  return 'Nesta adega: ' + ts.map(function (t) { var l = ligacao([t]); return t + ' — ' + (l ? plural(l.ids.length, 'rótulo', 'rótulos') : 'nenhum rótulo'); }).join(' · ');
+}
 function viewHistorico() {
   var head = topBar(btnBack('#/painel'), 'Histórico', (adegaAtual() || {}).nome, '', true);
   var items = feedItems(D.movs, D.alts);
@@ -1265,6 +1356,25 @@ function modalHtml(m) {
       '<dl class="conf"><dt>Já tinham foto</dt><dd>' + r.ja + '</dd><dt>Sem arquivo na pasta</dt><dd>' + r.semFoto + '</dd><dt>Arquivos sem item</dt><dd>' + r.sobra + '</dd>' + (r.erros ? '<dt>Falhas</dt><dd>' + r.erros + '</dd>' : '') + '</dl>' +
       '<p class="note">"Arquivos sem item" são fotos antigas que a planilha não usa mais.</p><button class="btn primary block" type="button" data-a="close">Fechar</button>' + SHEET_END;
   }
+  if (m.kind === 'noticia') {
+    if (m.step === 'del') {
+      return sheetOpen('Excluir notícia') + '<h2>Excluir esta notícia?</h2><p class="lead">Ela some de todas as adegas. Não dá para desfazer.</p>' + errLine(m) +
+        '<div class="stack-btn">' + busyBtn('doapagarnoticia', 'Excluir notícia', 'Excluindo…') + '<button class="btn block" type="button" ' + (m.direct ? 'data-a="close"' : 'data-a="step" data-x="form"') + '>Voltar</button></div>' + SHEET_END;
+    }
+    var pub = d.status === 'publicada';
+    return sheetOpen(d.id ? 'Editar notícia' : 'Nova notícia') + sheetHd(d.id ? 'Editar notícia' : 'Nova notícia') +
+      '<p class="lead">Sempre com a fonte e o link. O resumo é seu, em poucas linhas.</p>' +
+      field('Link da matéria', 'url', d.url, 'type="url" inputmode="url" autocapitalize="off" autocomplete="off" maxlength="500" placeholder="https://…"') +
+      field('Título', 'titulo', d.titulo, 'maxlength="160"') +
+      '<div class="grid2">' + field('Fonte', 'fonte', d.fonte, 'maxlength="60" placeholder="Ex.: Decanter"') + field('Data da matéria', 'publicada_em', d.publicada_em, 'type="date"') + '</div>' +
+      '<label class="fld">Resumo<textarea data-f="resumo" rows="3" maxlength="400" placeholder="O que importa para quem tem esse vinho guardado">' + esc(d.resumo || '') + '</textarea></label>' +
+      field('Ligar a (produtor, região ou país)', 'termos', d.termos, 'maxlength="200" autocapitalize="off" placeholder="Separe por vírgula"') +
+      '<p class="note" id="n-liga">' + esc(ligaTxt(d.termos)) + '</p>' +
+      (d.motivo && !pub ? '<p class="note"><b>Por que sugeri:</b> ' + esc(d.motivo) + ' (só você vê; some ao publicar)</p>' : '') +
+      errLine(m) + '<div class="stack-btn">' + busyBtn('donoticia', pub ? 'Salvar' : 'Publicar', 'Salvando…') +
+      '<button class="btn block" type="button" data-a="donoticia" data-x="rascunho"' + (S.busy ? ' disabled' : '') + '>' + (pub ? 'Tirar do ar (volta a rascunho)' : 'Salvar como rascunho') + '</button>' +
+      (d.id ? '<button class="btn block danger" type="button" data-a="step" data-x="del">Excluir</button>' : '') + '</div>' + SHEET_END;
+  }
   if (m.kind === 'senha') {
     return sheetOpen('Trocar senha') + sheetHd('Trocar senha') + '<p class="lead">Use pelo menos 8 caracteres. A nova senha vale para todos os aparelhos.</p>' +
       '<label class="fld">Nova senha<input data-f="s1" type="password" autocomplete="new-password" value="' + esc(d.s1 || '') + '"></label>' +
@@ -1283,6 +1393,7 @@ function menuHtml(side) {
   var a = adegaAtual(), A = X.adega, B = X.bar;
   var ab = countB(A.filter(function (id) { return paraAbrir(prod(id)); }));
   var th = PREF.theme || 'dark', pl = papel();
+  var rasc = D.noticias.filter(function (n) { return n.status !== 'publicada'; }).length;
   var adegasHtml = (S.me && S.me.is_admin && S.adegas.length) ? '<div class="dsec"><span class="lbl">Adegas</span>' + S.adegas.map(function (x) {
     return '<button class="adega-opt" type="button" data-a="adega" data-x="' + x.id + '" aria-current="' + (x.id === S.adegaId) + '"><i></i><span>' + esc(x.nome) + '</span><small>' + (x.garrafas ? plural(x.garrafas, 'garrafa', 'garrafas') : 'sem dados') + '</small></button>';
   }).join('') + '</div>' : '';
@@ -1295,6 +1406,7 @@ function menuHtml(side) {
       '<a class="dlink" href="#/bar" data-a="tab" data-x="#/bar"><span>Bar e outros</span><small>' + plural(B.length, 'item', 'itens') + '</small></a>' +
       '<a class="dlink" href="' + hrefGroup('abrir', 'todos') + '"><span>Para abrir logo</span>' + (ab ? '<span class="cnt">' + ab + '</span>' : '') + '</a>' +
       '<a class="dlink" href="#/historico"><span>Histórico</span></a>' +
+      ((S.me && S.me.is_admin) || noticiasDaAdega().length ? '<a class="dlink" href="#/noticias"><span>Do mundo do vinho</span>' + (S.me && S.me.is_admin && rasc ? '<span class="cnt">' + rasc + '</span>' : '') + '</a>' : '') +
       '<a class="dlink" href="#/painel" data-a="tab" data-x="#/painel"><span>Painel</span></a>' +
       (canManage() ? '<button class="dlink" type="button" data-a="pessoas"><span>Pessoas com acesso</span><small>' + plural(D.membros.length, 'pessoa', 'pessoas') + '</small></button>' : '') +
       (S.me && S.me.is_admin ? '<button class="dlink" type="button" data-a="fotoslote"><span>Importar fotos do AppSheet</span>' + I.img + '</button>' : '') +
@@ -1358,6 +1470,7 @@ function render() {
     else if (lr.name === 'vinho') html = viewFicha(lr.id);
     else if (lr.name === 'busca') html = viewBusca();
     else if (lr.name === 'historico') html = viewHistorico();
+    else if (lr.name === 'noticias') html = viewNoticias();
     else html = viewHome();
   }
   var screenKey = S.phase + ':' + routeKey(lr);
@@ -1576,6 +1689,72 @@ function doEntrada() {
     });
   });
 }
+function guardaNoticia(n) { D.noticias = ordenaNoticias(D.noticias.filter(function (x) { return x.id !== n.id; }).concat([n])); X.nd = null; }
+function pubNoticia(id) {
+  var n = D.noticias.filter(function (x) { return x.id === id; })[0]; if (!n) return;
+  var p = run('pub:' + id, function () {
+    return API.rpc('salvar_noticia', { p: { id: n.id, titulo: n.titulo, resumo: n.resumo || '', fonte: n.fonte, url: n.url, publicada_em: n.publicada_em || '', termos: n.termos || [], status: 'publicada' } }).then(function (nn) {
+      guardaNoticia(nn); snapshot(); toast('Notícia publicada.');
+    });
+  });
+  render();
+  if (p) p.then(render);
+}
+function urlChave(u) { return String(u || '').trim().toLowerCase().replace(/[#?].*$/, '').replace(/\/+$/, ''); }
+function importarSugestoes(file) {
+  if (!guardOnline() || S.busy) return;
+  var rd = new FileReader();
+  rd.onerror = function () { toast(MSG.sugestoes_invalidas, { err: true }); };
+  rd.onload = function () {
+    var arr = null; try { arr = JSON.parse(rd.result); } catch (e) {}
+    if (arr && !Array.isArray(arr)) arr = arr.sugestoes;
+    if (!Array.isArray(arr)) { toast(MSG.sugestoes_invalidas, { err: true }); return; }
+    var tem = {}, novas = [], ruins = 0;
+    D.noticias.forEach(function (n) { tem[urlChave(n.url)] = 1; });
+    arr.forEach(function (s) {
+      if (!s || !String(s.titulo || '').trim() || !String(s.fonte || '').trim() || !urlOk(s.url)) { ruins++; return; }
+      var k = urlChave(s.url); if (tem[k]) return; tem[k] = 1; novas.push(s);
+    });
+    var ja = arr.length - novas.length - ruins, feitas = 0;
+    var fim = function () {
+      X.nd = null; snapshot(); render();
+      toast(novas.length ? plural(feitas, 'sugestão importada', 'sugestões importadas') + (ja ? ' · ' + ja + ' já estavam na lista' : '') + (ruins ? ' · ' + ruins + ' sem título, fonte ou link' : '') + '.'
+        : (ja ? 'Nada novo: as ' + ja + ' sugestões do arquivo já estavam na lista.' : 'O arquivo não tem sugestões válidas.'), { err: !novas.length && !ja });
+    };
+    var p = run('sugestoes', function () {
+      return novas.reduce(function (pr, s) {
+        return pr.then(function () {
+          return API.rpc('salvar_noticia', { p: { id: '', titulo: s.titulo, resumo: s.resumo || '', fonte: s.fonte, url: String(s.url).trim(), publicada_em: s.publicada_em || '', termos: Array.isArray(s.termos) ? s.termos : parseTermos(s.termos), status: 'rascunho', motivo: s.motivo || '' } })
+            .then(function (n) { feitas++; D.noticias = ordenaNoticias(D.noticias.concat([n])); });
+        });
+      }, Promise.resolve()).then(fim, function (e) { if (feitas) { X.nd = null; snapshot(); } throw e; });
+    });
+    render();
+    if (p) p.then(render);
+  };
+  rd.readAsText(file);
+}
+function doNoticia(status) {
+  var m = S.modal, d = m.draft, url = String(d.url || '').trim();
+  if (!String(d.titulo || '').trim() || !String(d.fonte || '').trim() || !urlOk(url)) { m.err = MSG.noticia_invalida; return renderLayer(); }
+  return run('donoticia', function () {
+    return API.rpc('salvar_noticia', { p: { id: d.id || '', titulo: d.titulo, resumo: d.resumo || '', fonte: d.fonte, url: url, publicada_em: d.publicada_em || '', termos: parseTermos(d.termos), status: status, motivo: d.motivo || '' } }).then(function (n) {
+      guardaNoticia(n);
+      closeModal(); render(); snapshot();
+      toast(status === 'publicada' ? 'Notícia publicada.' : 'Rascunho salvo.');
+    });
+  });
+}
+function doApagarNoticia() {
+  var m = S.modal, id = m.draft.id;
+  return run('doapagarnoticia', function () {
+    return API.rpc('apagar_noticia', { p_id: id }).then(function () {
+      D.noticias = D.noticias.filter(function (x) { return x.id !== id; }); X.nd = null;
+      closeModal(); render(); snapshot();
+      toast('Notícia excluída.');
+    });
+  });
+}
 function doSenha() {
   var m = S.modal, d = m.draft;
   if (String(d.s1 || '').length < 8) { m.err = MSG.senha_fraca; return renderLayer(); }
@@ -1722,6 +1901,12 @@ document.addEventListener('click', function (ev) {
     case 'doeditar': doEditar(); break;
     case 'doentrada': doEntrada(); break;
     case 'dosenha': doSenha(); break;
+    case 'noticia': if (!(S.me && S.me.is_admin) || !guardOnline()) break; var nn = x ? D.noticias.filter(function (n) { return n.id === x; })[0] : null;
+      openModal({ kind: 'noticia', draft: nn ? { id: nn.id, url: nn.url, titulo: nn.titulo, fonte: nn.fonte, publicada_em: nn.publicada_em || '', resumo: nn.resumo || '', termos: (nn.termos || []).join(', '), status: nn.status, motivo: nn.motivo || '' } : { status: 'rascunho' } }); break;
+    case 'donoticia': doNoticia(x === 'rascunho' ? 'rascunho' : 'publicada'); break;
+    case 'pubnoticia': pubNoticia(x); break;
+    case 'delnoticia': if (!guardOnline()) break; openModal({ kind: 'noticia', step: 'del', direct: true, draft: { id: x } }); break;
+    case 'doapagarnoticia': doApagarNoticia(); break;
   }
 });
 document.addEventListener('input', function (ev) {
@@ -1730,6 +1915,7 @@ document.addEventListener('input', function (ev) {
   var f = t.getAttribute && t.getAttribute('data-f');
   if (f && S.modal) {
     S.modal.draft[f] = t.value;
+    if (f === 'termos' && S.modal.kind === 'noticia') { var lg = document.getElementById('n-liga'); if (lg) lg.textContent = ligaTxt(t.value); }
     if (f === 'nicho' && t.value) { S.modal.draft.area = null; var on = document.querySelector('[data-a="pickarea"][aria-pressed="true"]'); if (on) on.setAttribute('aria-pressed', 'false'); }
     if (f === 'nichos' && t.value) { S.modal.draft.area = null; var on2 = document.querySelector('[data-a="pickarea"][aria-pressed="true"]'); if (on2) on2.setAttribute('aria-pressed', 'false'); }
   }
@@ -1738,6 +1924,7 @@ document.addEventListener('change', function (ev) {
   var t = ev.target;
   if (t.id === 'f-foto' && t.files && t.files[0]) uploadFoto(t.files[0], t.getAttribute('data-p'));
   if ((t.id === 'f-lote' || t.id === 'f-lote2') && t.files && t.files.length) importarFotos(t.files);
+  if (t.id === 'f-sug' && t.files && t.files[0]) { importarSugestoes(t.files[0]); t.value = ''; }
 });
 document.addEventListener('submit', function (ev) {
   if (ev.target.id !== 'login-form') return;

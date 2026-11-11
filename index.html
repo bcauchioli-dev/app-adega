@@ -291,6 +291,32 @@ a.card:active{transform:scale(.97)}
 .hx b{font-family:var(--serif);font-weight:500;font-size:18px;line-height:1.2}
 .hx span{font-size:12.5px;color:var(--muted)}
 
+/* ---------- notícias ---------- */
+.hnews h2{margin-bottom:2px}
+.nsub{margin:0 0 12px;font-size:13px;color:var(--muted)}
+.nlist{display:grid;gap:10px;align-items:start}
+.news{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.news .src{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.news h3{font-family:var(--serif);font-weight:500;font-size:18px;line-height:1.25;margin:0;text-wrap:pretty}
+.news h3 .i{display:inline-block;width:14px;height:14px;margin-left:6px;vertical-align:-1px;color:var(--muted)}
+.news p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.45}
+.nliga{display:flex;align-items:center;gap:8px;min-height:36px;margin-top:4px;padding-top:10px;border-top:1px solid var(--line);font-size:13px;line-height:1.35;color:var(--gold-fg)}
+.nliga .i{width:16px;height:16px;flex:none}
+.nliga b{font-weight:600}
+.nliga.off{color:var(--muted)}
+.nadm{display:flex;align-items:center;gap:10px;min-width:0}
+.nadm .hint{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nadm .link{padding:6px 0}
+.ntag{flex:none;font-size:11px;font-weight:700;letter-spacing:.04em;border-radius:6px;padding:2px 7px;border:1px solid var(--line2);color:var(--muted)}
+.ntag.on{background:var(--gold-bg);color:var(--gold-fg);border-color:var(--gold-line)}
+.nbar{display:flex;flex-direction:column;align-items:flex-start;gap:12px;margin-top:14px}
+.nbtns{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.nmot{padding:10px 12px;border-radius:10px;background:var(--surface2);color:var(--fg2)!important}
+.nmot b{font-weight:600;color:var(--fg)}
+.nact{display:flex;flex-wrap:wrap;gap:8px;margin-top:2px}
+.nact .btn{height:40px;border-radius:20px;font-size:13.5px;padding:0 14px}
+.nact .btn .i{width:16px;height:16px}
+
 /* ---------- login ---------- */
 .login{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding-top:calc(var(--sat) + 24px);padding-bottom:calc(var(--sab) + 24px)}
 .login h1{margin:0;font-family:var(--serif);font-weight:500;font-size:40px;line-height:1.08;letter-spacing:-.01em}
@@ -433,6 +459,7 @@ html.vt-flat .top,html.vt-flat .dock,html.vt-flat .actions{view-transition-name:
   .ssearch kbd{margin-left:auto;font:inherit;font-size:12px;border:1px solid var(--line2);border-radius:6px;padding:1px 7px;color:var(--faint)}
   .stools .btn{height:44px}
   a.row:hover,.grow:hover,.hx:hover,.sc:hover,.tile:hover,.hsearch:hover{background:var(--surface2)}
+  .news h3 a:hover{color:var(--gold-fg)}
   .hsearch:hover{border-color:var(--gold)}
   .res.w:hover .nm{color:var(--gold-fg)}
   .row.sel{border-color:var(--gold);background:var(--gold-bg)}
@@ -458,6 +485,9 @@ html.vt-flat .top,html.vt-flat .dock,html.vt-flat .actions{view-transition-name:
   .pgrid>.cards,.pgrid>.hint{column-span:all}
   .pgrid>.panel{break-inside:avoid;margin:0 0 12px}
   .pgrid>.cards{margin-bottom:12px}
+  .nlist{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
+  .nbar{flex-direction:row;align-items:center}
+  .nbtns{flex:none}
   .hcols>:only-child{grid-column:1/-1}
   .hcols>:only-child .hxs{grid-template-columns:repeat(4,minmax(0,1fr))}
 }

@@ -3,7 +3,7 @@
 (function () {
 'use strict';
 
-var VERSION = '1.1.0';
+var VERSION = '1.2.0';
 var CFG = window.APP_CONFIG || {};
 var YEAR = new Date().getFullYear();
 var STYLE_ORDER = ['tinto', 'branco', 'rosé', 'espumante', 'doce/fortificado'];
@@ -43,6 +43,7 @@ var I = {
   close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
   chev: svg('<path d="M9 6l6 6-6 6"/>'),
   clock: svg('<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>'),
+  home: svg('<path d="M4 11l8-7 8 7v8a1 1 0 0 1-1 1h-4.500v-6h-5v6H5a1 1 0 0 1-1-1z"/>'),
   glass: svg('<path d="M7.5 3h9l-.7 6a3.8 3.8 0 0 1-7.6 0z"/><path d="M12 13v7M8.5 21h7"/>'),
   bar: svg('<path d="M6 4h12l-1.6 15.2a1 1 0 0 1-1 .8H8.6a1 1 0 0 1-1-.8z"/><path d="M6.7 10h10.6"/>'),
   chart: svg('<path d="M5 20V10M10 20V4M15 20v-7M20 20v-4"/>'),
@@ -404,11 +405,12 @@ function applyTheme() {
 if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (PREF.theme === 'system') applyTheme(); });
 
 /* ------------------------------------------------------------------ rotas, transições e voltar */
-var DEPTH = { home: 0, bar: 0, painel: 0, grupo: 1, busca: 1, historico: 1, vinho: 2 };
+var DEPTH = { home: 0, vinhos: 0, bar: 0, painel: 0, grupo: 1, busca: 1, historico: 1, vinho: 2 };
 function parseHash() {
   var h = location.hash.replace(/^#\/?/, '');
   var parts = h ? h.split('/').map(function (x) { try { return decodeURIComponent(x); } catch (e) { return x; } }) : [];
   switch (parts[0]) {
+    case 'vinhos': return { name: 'vinhos' };
     case 'bar': return { name: 'bar' };
     case 'painel': return { name: 'painel' };
     case 'busca': return { name: 'busca' };
@@ -762,14 +764,41 @@ function noticeHtml() {
   if (late) return '<a class="notice" href="' + hrefGroup('abrir', 'todos') + '">' + I.clock + '<span>' + plural(late, 'garrafa passou', 'garrafas passaram') + ' da janela indicada.</span><b>Ver</b></a>';
   return '';
 }
+function saudacao() { var h = new Date().getHours(); return h < 5 ? 'Boa noite' : h < 12 ? 'Bom dia' : h < 18 ? 'Boa tarde' : 'Boa noite'; }
 function viewHome() {
   var total = countB(X.adega) + countB(X.bar);
   var a = adegaAtual();
-  var head = topBar(btnMenu(), 'Olá, ' + (meuNome() || ''), (a ? a.nome : '') + ' · ' + plural(total, 'garrafa', 'garrafas'), btnSearch());
+  var head = '<header class="top" id="top"><div class="top-in wrap">' + btnMenu() +
+    '<div class="ttl ctr"><span class="sub">' + esc(a ? a.nome : '') + '</span></div><span class="ib-sp" aria-hidden="true"></span></div>' + offlineBar() + '</header>';
   if (S.ui.loadingAdega) return head + '<main class="wrap content">' + skeletonRows(7) + '</main>';
   if (!X.adega.length && !X.bar.length) {
     return head + '<main class="wrap content">' + emptyState('Nenhuma garrafa ainda', 'Esta adega ainda não tem garrafas cadastradas. A importação da planilha está pendente.',
       canWrite() ? '<button class="btn primary" type="button" data-a="entrada">Registrar a primeira entrada</button>' : '') + '</main>';
+  }
+  var nome = meuNome();
+  var recent = (PREF.buscas || []).slice(0, 3);
+  var hero = '<section class="hhero"><h1 class="hello">' + saudacao() + (nome ? ', <em>' + esc(nome) + '</em>' : '') + '</h1><p class="hsub">O que você procura hoje?</p>' +
+    '<a class="hsearch" href="#/busca" data-a="newq">' + I.search + '<span>Vinho, produtor, nicho…</span></a>' +
+    (recent.length ? '<div class="hrecent" aria-label="Buscas recentes">' + recent.map(function (q) { return '<a class="hchip" href="#/busca" data-a="tryq" data-x="' + esc(q) + '"><span>' + esc(q) + '</span></a>'; }).join('') + '</div>' : '') + '</section>';
+  var paises = groupsFor('pais', X.adega).filter(function (g) { return g.key !== '—'; }).length;
+  var stats = '<div class="hstats"><div><b>' + nfmt(total) + '</b><span>' + (total === 1 ? 'garrafa' : 'garrafas') + '</span></div>' +
+    '<div><b>' + nfmt(X.adega.length + X.bar.length) + '</b><span>rótulos</span></div>' +
+    '<div><b>' + nfmt(paises) + '</b><span>' + (paises === 1 ? 'país' : 'países') + '</span></div></div>';
+  var tipos = groupsFor('tipo', X.adega).length, locais = groupsFor('local', X.adega).length, avals = groupsFor('avaliacao', X.adega).filter(function (g) { return g.key !== '—'; }).length;
+  var ex = function (modo, t, s) { return '<a class="hx" href="#/vinhos" data-a="vermodo" data-x="' + modo + '"><b>' + t + '</b><span>' + esc(s) + '</span></a>'; };
+  var explorar = X.adega.length ? '<section class="hsec"><h2>Explorar a adega</h2><div class="hxs">' +
+    ex('pais', 'País', plural(paises, 'país', 'países')) + ex('tipo', 'Tipo', plural(tipos, 'tipo', 'tipos')) +
+    ex('avaliacao', 'Avaliação', plural(avals, 'nível', 'níveis')) + ex('local', 'Local', plural(locais, 'local', 'locais')) + '</div></section>' : '';
+  var feed = feedItems(D.movs, []).filter(function (it) { return !it.legado; }).slice(0, 3);
+  var movs = feed.length ? '<section class="hsec"><h2>Últimos movimentos<a class="link" href="#/historico">Histórico</a></h2><div class="feed">' + feedHtml(feed, true) + '</div></section>' : '';
+  return head + '<main class="wrap content home">' + hero + stats + explorar + movs + '</main>';
+}
+function viewVinhos() {
+  var head = topBar(btnMenu(), 'Vinhos', plural(countB(X.adega), 'garrafa', 'garrafas') + ' · ' + plural(X.adega.length, 'rótulo', 'rótulos'), btnSearch(), true);
+  if (S.ui.loadingAdega) return head + '<main class="wrap content">' + skeletonRows(7) + '</main>';
+  if (!X.adega.length) {
+    return head + '<main class="wrap content">' + emptyState('Nenhum vinho em estoque', 'Esta adega não tem vinhos em estoque agora.',
+      canWrite() ? '<button class="btn primary" type="button" data-a="entrada">Registrar uma entrada</button>' : '') + '</main>';
   }
   var ab = X.adega.filter(function (id) { return paraAbrir(prod(id)); });
   var ic = X.adega.filter(function (id) { return prod(id).avaliacao === 'Ícone'; });
@@ -805,7 +834,7 @@ function viewGroup(r) {
   var pool = bar ? X.bar : X.adega;
   var ids = idsInGroup(r.modo, r.chave, pool);
   var title = groupTitle(r.modo, r.chave);
-  var head = topBar(btnBack(bar ? '#/bar' : '#/'), title, plural(ids.length, bar ? 'item' : 'rótulo', bar ? 'itens' : 'rótulos') + ' · ' + plural(countB(ids), 'garrafa', 'garrafas'), btnSearch(), true);
+  var head = topBar(btnBack(bar ? '#/bar' : '#/vinhos'), title, plural(ids.length, bar ? 'item' : 'rótulo', bar ? 'itens' : 'rótulos') + ' · ' + plural(countB(ids), 'garrafa', 'garrafas'), btnSearch(), true);
   if (!ids.length) return head + '<main class="wrap content">' + emptyState('Nada por aqui', 'Não há garrafas em estoque neste grupo agora.') + '</main>';
   var ck = routeKey(r), chip = S.ui.chips[ck] || 'todos';
   var chips = [['todos', 'Todos · ' + countB(ids)]];
@@ -948,7 +977,7 @@ function viewFicha(id) {
   var hist = items.length ? '<div class="feed">' + feedHtml(items, false) + '</div>' : (fx ? '<p>Nenhum registro ainda.</p>' : '<div class="sk" style="height:48px"></div>');
   var right = write ? '<button class="pill" type="button" data-a="editar" data-x="' + id + '">' + I.edit + 'Editar</button>' : '';
   var actions = fichaActions(id);
-  return '<header class="top" id="top"><div class="top-in wrap">' + btnBack(p.secao === 'bar' ? '#/bar' : '#/') + '<div class="ttl"><span class="h1" aria-hidden="true">' + esc(p.nome) + (p.safra ? ' ' + p.safra : '') + '</span></div>' + right + '</div>' + offlineBar() + '</header>' +
+  return '<header class="top" id="top"><div class="top-in wrap">' + btnBack(p.secao === 'bar' ? '#/bar' : '#/vinhos') + '<div class="ttl"><span class="h1" aria-hidden="true">' + esc(p.nome) + (p.safra ? ' ' + p.safra : '') + '</span></div>' + right + '</div>' + offlineBar() + '</header>' +
     '<main class="wrap content' + (actions ? ' has-actions' : '') + '"><section class="hero">' + photo + '<div class="info">' + rating + '<h1>' + esc(p.nome) + '</h1>' + (line2 ? '<p class="m">' + esc(line2) + '</p>' : '') + '<p>' + esc(line3) + '</p></div></section>' +
     '<section class="sec"><div class="sec-h"><h2>' + plural(gs.length, 'garrafa', 'garrafas') + (gs.length ? ' · ' + esc(locLabel(gs, true)) : '') + '</h2>' + (write ? '<button class="link" type="button" data-a="adicionar" data-x="' + id + '">+ Adicionar</button>' : '') + '</div>' + slots + '</section>' +
     win + '<section class="sec">' + kv + '</section>' +
@@ -959,6 +988,81 @@ function fichaActions(id) {
   var p = prod(id);
   if (!p || !canWrite() || !stock(id).length) return '';
   return '<div class="actions"><button class="btn primary" type="button" data-a="consumir" data-x="' + id + '">Abrir uma garrafa</button><button class="btn" type="button" data-a="mover" data-x="' + id + '">Mover</button></div>';
+}
+/* busca: realce do termo, tolerância a erro de digitação e resultados agrupados */
+function hl(text, q) {
+  text = String(text == null ? '' : text);
+  var toks = String(q || '').split(/\s+/).filter(function (t) { return t.length >= 2; });
+  if (!toks.length) return esc(text);
+  var map = [], n = '';
+  for (var i = 0; i < text.length; i++) { var c = norm(text[i]); for (var k = 0; k < c.length; k++) { n += c[k]; map.push(i); } }
+  var on = new Array(text.length);
+  toks.forEach(function (t) { var at = n.indexOf(t); if (at < 0) return; for (var x = at; x < at + t.length; x++) on[map[x]] = true; });
+  var out = '', open = false;
+  for (var j = 0; j < text.length; j++) {
+    if (on[j] && !open) { out += '<em class="hl">'; open = true; }
+    if (!on[j] && open) { out += '</em>'; open = false; }
+    out += esc(text[j]);
+  }
+  return out + (open ? '</em>' : '');
+}
+function dist1(a, b) {
+  var la = a.length, lb = b.length;
+  if (Math.abs(la - lb) > 1) return false;
+  var i = 0, j = 0, e = 0;
+  while (i < la && j < lb) {
+    if (a[i] === b[j]) { i++; j++; continue; }
+    if (++e > 1) return false;
+    if (la > lb) i++; else if (lb > la) j++; else { i++; j++; }
+  }
+  return e + (la - i) + (lb - j) <= 1;
+}
+function buscar(q) {
+  var res = [], qn = q.replace(/^nichos?\s*/, ''), isNum = /^\d{1,4}$/.test(qn);
+  var toks = q.split(/\s+/).filter(Boolean);
+  var ocas = new Map();
+  D.movs.forEach(function (m) { if (m.ocasiao || m.com_quem || (m.nota && m.nota !== NOTA_IMPORT)) { var g = D.garrafas.get(m.garrafa_id); if (g) { var t = norm([m.ocasiao, m.com_quem, m.nota].join(' ')); ocas.set(g.produto_id, (ocas.get(g.produto_id) || '') + ' ' + t); } } });
+  function campos(p) { return [['nome', p.nome], ['produtor', p.produtor], ['região', p.regiao], ['país', p.pais], ['tipo', STYLE_ONE[p.estilo] || p.categoria], ['categoria', p.categoria], ['notas', p.notas]]; }
+  function passo(aprox) {
+    D.produtos.forEach(function (p) {
+      var gs = stock(p.id), hit = null, f = campos(p), k;
+      if (!aprox) {
+        if (isNum) {
+          var n = parseInt(qn, 10);
+          if (gs.some(function (g) { var L = locOf(g); return isNicho(L) && nichoNum(L) === n; })) hit = 'nicho';
+          else if (qn.length === 4 && p.safra === n) hit = 'safra';
+        }
+        if (!hit) for (k = 0; k < f.length; k++) if (f[k][1] && norm(f[k][1]).indexOf(q) >= 0) { hit = f[k][0]; break; }
+        if (!hit && toks.length > 1) {
+          var tudo = norm(f.map(function (x) { return x[1] || ''; }).join(' ') + ' ' + (p.safra || ''));
+          if (toks.every(function (t) { return tudo.indexOf(t) >= 0; })) { for (k = 0; k < f.length; k++) if (f[k][1] && norm(f[k][1]).indexOf(toks[0]) >= 0) { hit = f[k][0]; break; } hit = hit || 'safra'; }
+        }
+        if (!hit && gs.some(function (g) { var L = locOf(g); return L && !isNicho(L) && norm(L.nome).indexOf(q) >= 0; })) hit = 'local';
+        if (!hit && (ocas.get(p.id) || '').indexOf(q) >= 0) hit = 'histórico';
+      } else {
+        for (k = 0; k < 4 && !hit; k++) {
+          var ws = norm(f[k][1] || '').split(/[^a-z0-9]+/).filter(Boolean);
+          if (toks.every(function (t) { return t.length < 4 ? ws.indexOf(t) >= 0 : ws.some(function (w) { return dist1(t, w) || (t.length >= 5 && dist1(t, w.slice(0, t.length))); }); })) hit = f[k][0];
+        }
+      }
+      if (hit) res.push({ id: p.id, h: hit, n: gs.length });
+    });
+  }
+  passo(false);
+  var aprox = false;
+  if (!res.length && !isNum && q.length >= 4) { passo(true); aprox = res.length > 0; }
+  res.sort(function (a, b) { return ((b.h === 'nome') - (a.h === 'nome')) || cmp(prod(a.id).nome, prod(b.id).nome) || (prod(a.id).safra || 0) - (prod(b.id).safra || 0); });
+  var grupos = [];
+  if (!isNum && q.length >= 2) {
+    var add = function (modo, tipo, pool, secao) {
+      groupsFor(modo, pool).forEach(function (g) {
+        if (g.key === '—' || g.key === 'none' || (modo === 'local' && g.key.indexOf('a:') !== 0)) return;
+        if (norm(g.label).indexOf(q) >= 0) grupos.push({ label: g.label, tipo: tipo, n: g.n, href: hrefGroup(modo, g.key, secao) });
+      });
+    };
+    add('pais', 'país', X.adega); add('tipo', 'tipo de vinho', X.adega); add('avaliacao', 'avaliação', X.adega); add('local', 'local', X.adega); add('cat', 'categoria do bar', X.bar, 'bar');
+  }
+  return { estoque: res.filter(function (r) { return r.n > 0; }), fora: res.filter(function (r) { return !r.n; }), grupos: grupos.slice(0, 4), aprox: aprox };
 }
 function viewBusca() {
   var q = norm(S.ui.q).trim();
@@ -977,30 +1081,33 @@ function viewBusca() {
       '<a class="tile" href="#/historico"><b>' + I.clock + '</b><span>Histórico</span></a></div>' +
       (recent.length ? '<p class="sect-label">Buscas recentes</p>' + recent.map(function (s) { return '<button class="res" type="button" data-a="try" data-x="' + esc(s) + '" style="grid-template-columns:1fr"><span class="meta" style="font-size:15px;color:var(--fg)">' + esc(s) + '</span></button>'; }).join('') : '');
   } else {
-    var res = [], qn = q.replace(/^nicho\s*/, ''), isNum = /^\d{1,4}$/.test(qn);
-    var ocas = new Map(); D.movs.forEach(function (m) { if (m.ocasiao || m.com_quem || (m.nota && m.nota !== NOTA_IMPORT)) { var g = D.garrafas.get(m.garrafa_id); if (g) { var t = norm([m.ocasiao, m.com_quem, m.nota].join(' ')); ocas.set(g.produto_id, (ocas.get(g.produto_id) || '') + ' ' + t); } } });
-    D.produtos.forEach(function (p) {
-      var gs = stock(p.id), hit = null;
-      if (isNum) {
-        var n = parseInt(qn, 10);
-        if (gs.some(function (g) { var L = locOf(g); return isNicho(L) && nichoNum(L) === n; })) hit = 'nicho';
-        else if (qn.length === 4 && p.safra === n) hit = 'safra';
-      }
-      if (!hit) {
-        var f = [['nome', p.nome], ['produtor', p.produtor], ['região', p.regiao], ['país', p.pais], ['tipo', STYLE_ONE[p.estilo] || p.categoria], ['categoria', p.categoria], ['notas', p.notas]];
-        for (var k = 0; k < f.length; k++) if (f[k][1] && norm(f[k][1]).indexOf(q) >= 0) { hit = f[k][0]; break; }
-      }
-      if (!hit && gs.some(function (g) { var L = locOf(g); return L && !isNicho(L) && norm(L.nome).indexOf(q) >= 0; })) hit = 'local';
-      if (!hit && (ocas.get(p.id) || '').indexOf(q) >= 0) hit = 'histórico';
-      if (hit && (gs.length || hit === 'histórico')) res.push({ id: p.id, h: hit, n: gs.length });
-    });
-    res.sort(function (a, b) { return ((b.n > 0) - (a.n > 0)) || cmp(prod(a.id).nome, prod(b.id).nome) || (prod(a.id).safra || 0) - (prod(b.id).safra || 0); });
-    var tot = res.reduce(function (s, r) { return s + r.n; }, 0);
-    body = res.length ? '<p class="sect-label" style="margin-top:4px">' + plural(res.length, 'resultado', 'resultados') + ' · ' + plural(tot, 'garrafa', 'garrafas') + '</p>' + res.slice(0, 80).map(function (r) {
-      var p = prod(r.id), gs = stock(r.id);
-      return '<a class="res" data-k="r:' + r.id + '" href="#/v/' + r.id + '" data-a="savequery"><span class="nm">' + esc(p.nome) + (safra(p) ? ' <span>' + esc(safra(p)) + '</span>' : '') + '</span><span class="q">' + r.n + '</span><span class="meta">' + esc([p.avaliacao, gs.length ? locLabel(gs, true) : 'sem estoque'].filter(Boolean).join(' · ')) + ' · <mark>' + esc(r.h) + '</mark></span></a>';
-    }).join('') + (res.length > 80 ? '<p class="hint">Mostrando 80 de ' + res.length + '. Refine a busca.</p>' : '')
-      : emptyState('Nada encontrado', 'Nada para “' + S.ui.q + '”. Tente o produtor, a região ou o número do nicho.');
+    var R = buscar(q);
+    var filtro = (S.ui.qf === 'fora' || !R.estoque.length) && R.fora.length ? 'fora' : 'estoque';
+    var lista = filtro === 'fora' ? R.fora : R.estoque;
+    var tot = R.estoque.reduce(function (s, r) { return s + r.n; }, 0);
+    var chips = R.fora.length ? '<div class="qf" role="group" aria-label="Filtrar resultados">' +
+      '<button class="chip" type="button" data-a="qf" data-x="estoque" aria-pressed="' + (filtro === 'estoque') + '">Em estoque · ' + R.estoque.length + '</button>' +
+      '<button class="chip" type="button" data-a="qf" data-x="fora" aria-pressed="' + (filtro === 'fora') + '">Já consumidos · ' + R.fora.length + '</button></div>' : '';
+    var atalhos = R.grupos.length ? '<p class="sect-label">Atalhos</p><div class="scs">' + R.grupos.map(function (g) {
+      return '<a class="sc" data-k="g:' + esc(g.href) + '" href="' + g.href + '" data-a="savequery"><span class="sct"><span class="scn">' + hl(g.label, q) + '</span><span class="sck">' + esc(g.tipo) + '</span></span><span class="gc">' + nfmt(g.n) + '</span><span class="chev">' + I.chev + '</span></a>';
+    }).join('') + '</div>' : '';
+    var rows = lista.slice(0, 80).map(function (r) {
+      var p = prod(r.id), gs = stock(r.id), j = janela(p);
+      var flag = !gs.length ? '' : j.k === 'ultimo' ? ' · <span class="flag">último ano</span>' : j.k === 'passou' ? ' · <span class="flag late">passou da janela</span>' : j.k === 'ponto' ? ' · <span class="flag ok">no ponto</span>' : '';
+      var onde = r.h === 'nome' ? '' : ' · <mark>' + esc(r.h) + '</mark>';
+      var extra = r.h === 'produtor' && p.produtor ? hl(p.produtor, q) : r.h === 'região' && p.regiao ? hl(p.regiao, q) : '';
+      return '<a class="res w" data-k="r:' + r.id + '" href="#/v/' + r.id + '" data-a="savequery">' + thumb(p) +
+        '<span class="info"><span class="nm">' + hl(p.nome, q) + (safra(p) ? ' <span>' + esc(safra(p)) + '</span>' : '') + '</span>' +
+        (extra ? '<span class="ex">' + extra + '</span>' : '') +
+        '<span class="meta">' + esc([p.avaliacao, gs.length ? locLabel(gs, true) : 'sem estoque'].filter(Boolean).join(' · ')) + flag + onde + '</span></span>' +
+        '<span class="q">' + (r.n || '') + '</span></a>';
+    }).join('');
+    var titulo = filtro === 'fora' ? plural(R.fora.length, 'rótulo já consumido', 'rótulos já consumidos') : plural(R.estoque.length, 'resultado', 'resultados') + ' · ' + plural(tot, 'garrafa', 'garrafas');
+    if (!R.estoque.length && !R.fora.length && !R.grupos.length) body = emptyState('Nada encontrado', 'Nada para “' + S.ui.q + '”. Tente o produtor, a região ou o número do nicho.');
+    else body = chips + atalhos +
+      (lista.length ? '<p class="sect-label"' + (atalhos || chips ? '' : ' style="margin-top:4px"') + '>' + titulo + (R.aprox ? ' · grafia parecida' : '') + '</p>' + rows +
+        (lista.length > 80 ? '<p class="hint">Mostrando 80 de ' + lista.length + '. Refine a busca.</p>' : '')
+        : '<p class="hint" style="padding:16px 0">Nenhum item em estoque para “' + esc(S.ui.q) + '”.' + (R.fora.length ? ' Veja em “Já consumidos”.' : '') + '</p>');
   }
   return head + '<main class="wrap content">' + body + '</main>';
 }
@@ -1018,7 +1125,7 @@ function viewPainel() {
   var cons = feedItems(D.movs.filter(function (m) { return m.tipo === 'consumo'; }), []).slice(0, 5);
   return head + '<main class="wrap content"><div class="cards">' +
     '<div class="card"><span class="k">Total</span><span class="v">' + nfmt(nA + nB) + '</span><span class="s">garrafas em estoque</span></div>' +
-    '<a class="card" href="#/" data-a="tab" data-x="#/"><span class="k" style="color:var(--wine-fg)">Vinhos</span><span class="v">' + nfmt(nA) + '</span><span class="s">' + plural(A.length, 'rótulo', 'rótulos') + '</span></a>' +
+    '<a class="card" href="#/vinhos" data-a="tab" data-x="#/vinhos"><span class="k" style="color:var(--wine-fg)">Vinhos</span><span class="v">' + nfmt(nA) + '</span><span class="s">' + plural(A.length, 'rótulo', 'rótulos') + '</span></a>' +
     '<a class="card" href="#/bar" data-a="tab" data-x="#/bar"><span class="k">Bar e outros</span><span class="v">' + nfmt(nB) + '</span><span class="s">' + plural(B.length, 'item', 'itens') + '</span></a>' +
     '<a class="card gold" href="' + hrefGroup('avaliacao', 'Ícone') + '"><span class="k">Ícone e A+</span><span class="v">' + nfmt(countB(ic) + countB(ap)) + '</span><span class="s">' + ic.length + ' Ícones · ' + ap.length + ' A+</span></a></div>' +
     (nA ? '<section class="panel"><h2>Janela de consumo em ' + YEAR + '<small>garrafas de vinho</small></h2><div class="stack" role="img" aria-label="Garrafas por situação da janela de consumo">' + stackH + '</div><div class="legend">' + leg + '</div></section>' +
@@ -1172,7 +1279,8 @@ function menuHtml() {
     '<div class="dsec" style="padding-top:20px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px"><div style="min-width:0"><div style="font-family:var(--serif);font-size:24px;line-height:1.15">' + esc(a ? a.nome : 'App Adega') + '</div><div class="hint" style="margin-top:2px">' + plural(countB(A) + countB(B), 'garrafa', 'garrafas') + ' · ' + plural(A.length + B.length, 'rótulo', 'rótulos') + '</div></div><button class="ib ghost" type="button" data-a="close" aria-label="Fechar menu" style="margin:-8px -10px 0 0">' + I.close + '</button></div></div>' +
     adegasHtml +
     '<div class="dsec"><span class="lbl">Adega</span>' +
-      '<a class="dlink" href="#/" data-a="tab" data-x="#/"><span>Vinhos</span><small>' + plural(A.length, 'rótulo', 'rótulos') + '</small></a>' +
+      '<a class="dlink" href="#/" data-a="tab" data-x="#/"><span>Início</span></a>' +
+      '<a class="dlink" href="#/vinhos" data-a="tab" data-x="#/vinhos"><span>Vinhos</span><small>' + plural(A.length, 'rótulo', 'rótulos') + '</small></a>' +
       '<a class="dlink" href="#/bar" data-a="tab" data-x="#/bar"><span>Bar e outros</span><small>' + plural(B.length, 'item', 'itens') + '</small></a>' +
       '<a class="dlink" href="' + hrefGroup('abrir', 'todos') + '"><span>Para abrir logo</span>' + (ab ? '<span class="cnt">' + ab + '</span>' : '') + '</a>' +
       '<a class="dlink" href="#/historico"><span>Histórico</span></a>' +
@@ -1218,6 +1326,7 @@ function render() {
   else if (S.phase === 'erro') html = viewMessage('Não foi possível carregar', S.ui.bootErr || 'Tente de novo em instantes.', '<button class="btn primary" type="button" data-a="retry">Tentar de novo</button>');
   else {
     if (r.name === 'home') { html = viewHome(); showDock = true; }
+    else if (r.name === 'vinhos') { html = viewVinhos(); showDock = true; }
     else if (r.name === 'bar') { html = viewBar(); showDock = true; }
     else if (r.name === 'painel') { html = viewPainel(); showDock = true; }
     else if (r.name === 'grupo') html = viewGroup(r);
@@ -1233,7 +1342,8 @@ function render() {
   if (showDock) {
     var t = r.name, bar = t === 'bar';
     dockHtml = '<div class="dock"><nav aria-label="Seções">' +
-      '<a href="#/" data-a="tab" data-x="#/"' + (t === 'home' ? ' aria-current="page"' : '') + '>' + I.glass + 'Adega</a>' +
+      '<a href="#/" data-a="tab" data-x="#/"' + (t === 'home' ? ' aria-current="page"' : '') + '>' + I.home + 'Início</a>' +
+      '<a href="#/vinhos" data-a="tab" data-x="#/vinhos"' + (t === 'vinhos' ? ' aria-current="page"' : '') + '>' + I.glass + 'Vinhos</a>' +
       '<a href="#/bar" data-a="tab" data-x="#/bar"' + (bar ? ' aria-current="page"' : '') + '>' + I.bar + 'Bar</a>' +
       '<a href="#/painel" data-a="tab" data-x="#/painel"' + (t === 'painel' ? ' aria-current="page"' : '') + '>' + I.chart + 'Painel</a></nav>' +
       (canWrite() ? '<button class="fab" type="button" data-a="entrada" data-x="' + (bar ? 'bar' : '') + '" aria-label="' + (bar ? 'Nova entrada no bar' : 'Nova entrada de vinho') + '">' + I.plus + '</button>' : '') + '</div>';
@@ -1515,6 +1625,9 @@ document.addEventListener('click', function (ev) {
     ev.preventDefault();
     var href = a.getAttribute('href'), aact = a.getAttribute('data-a');
     if (aact === 'savequery') saveQuery();
+    if (aact === 'newq') S.ui.q = '';
+    if (aact === 'tryq') S.ui.q = a.getAttribute('data-x') || '';
+    if (aact === 'vermodo') { S.ui.ver = a.getAttribute('data-x'); PREF.ver = S.ui.ver; savePref(); navIntent = 'tab'; location.replace(href); return; }
     if (aact === 'tab') { if (m) leaveModal(function () { goTab(href); }); else goTab(href); return; }
     if (sameHash(href)) { if (m) closeModal(); else window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (m) leaveModal(function () { go(href); }); else go(href);
@@ -1532,6 +1645,7 @@ document.addEventListener('click', function (ev) {
     case 'ver': S.ui.ver = x; PREF.ver = x; savePref(); render(); break;
     case 'barver': S.ui.barVer = x; PREF.barVer = x; savePref(); render(); break;
     case 'chip': S.ui.chips[el.getAttribute('data-ck')] = x; render(); break;
+    case 'qf': S.ui.qf = x; render(); break;
     case 'try': S.ui.q = x; var qi = document.getElementById('q'); if (qi) qi.value = x; render(); break;
     case 'theme': PREF.theme = x; savePref(); applyTheme(); renderLayer(); break;
     case 'sync': sync(false).then(function (ok) { if (S.modal) renderLayer(); if (ok) toast('Dados atualizados.'); else if (S.ui.offline) toast(MSG.rede, { err: true }); }); renderLayer(); break;

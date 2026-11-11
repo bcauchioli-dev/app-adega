@@ -242,6 +242,54 @@ a.card:active{transform:scale(.97)}
 .res .q{font-weight:700;font-size:17px;text-align:right}
 .res mark{background:transparent;color:var(--gold-fg);font-weight:700}
 .hint{font-size:13px;color:var(--muted);line-height:1.45}
+.res.w{display:flex;align-items:center;gap:12px;padding:10px 0}
+.res.w .thumb{width:40px;height:54px;border-radius:8px}
+.res.w .info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.res.w .nm{font-size:17px;overflow-wrap:anywhere}
+.res .ex{font-size:13px;color:var(--fg2)}
+.res .q{min-width:22px}
+.hl{font-style:normal;color:var(--gold-fg)}
+.flag.ok{color:var(--ok)}
+.qf{display:flex;gap:8px;padding:12px 0 2px;flex-wrap:wrap}
+.scs{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.sc{display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;min-height:56px;border-bottom:1px solid var(--line);transition:background .12s}
+.sc:last-child{border-bottom:0}
+.sc:active{background:var(--surface2)}
+.sc .sct{flex:1;min-width:0;display:flex;flex-direction:column}
+.sc .scn{font-family:var(--serif);font-size:17px;line-height:1.25}
+.sc .sck{font-size:12px;color:var(--muted)}
+.sc .gc{font-size:15px;font-weight:700}
+.sc .chev{color:var(--faint);display:flex}
+
+/* ---------- início ---------- */
+.top .ttl.ctr{align-items:center;text-align:center}
+.top .ttl.ctr .sub{font-size:11.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;max-width:100%}
+.ib-sp{width:44px;flex:none}
+.home{position:relative;overflow-x:clip}
+.home::before{content:"";position:absolute;left:50%;top:-150px;width:560px;max-width:140%;height:440px;transform:translateX(-50%);background:radial-gradient(closest-side,color-mix(in srgb,var(--gold) 14%,transparent),transparent);pointer-events:none}
+.hhero{position:relative;text-align:center;padding:max(26px,7vh) 0 26px}
+.hhero .hello{margin:0;font-family:var(--serif);font-weight:400;font-size:clamp(28px,8.400vw,34px);line-height:1.12;letter-spacing:-.01em;overflow-wrap:anywhere}
+.hhero .hello em{font-style:normal;color:var(--gold-fg)}
+.hsub{margin:8px 0 0;color:var(--muted);font-size:15px}
+.hsearch{margin-top:22px;display:flex;align-items:center;gap:12px;height:58px;padding:0 18px;border-radius:18px;background:var(--surface);border:1px solid var(--line2);color:var(--muted);font-size:16px;text-align:left;box-shadow:0 0 0 5px color-mix(in srgb,var(--gold) 7%,transparent),var(--shadow);transition:transform .15s var(--ease),border-color .15s}
+.hsearch:active{transform:scale(.985);border-color:var(--gold)}
+.hsearch svg.i{color:var(--gold);width:22px;height:22px}
+.hrecent{display:flex;justify-content:center;flex-wrap:wrap;gap:0 8px;margin-top:10px;max-height:44px;overflow:hidden}
+.hchip{height:44px;display:inline-flex;align-items:center;max-width:46%}
+.hchip span{height:32px;line-height:30px;padding:0 13px;border:1px dashed var(--line2);border-radius:16px;font-size:13px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hstats{position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.hstats div{padding:14px 4px;text-align:center;border-left:1px solid var(--line)}
+.hstats div:first-child{border-left:0}
+.hstats b{display:block;font-family:var(--serif);font-weight:400;font-size:26px;line-height:1.1}
+.hstats span{font-size:12px;color:var(--muted);letter-spacing:.03em}
+.hsec{position:relative;margin-top:30px}
+.hsec h2{margin:0 0 12px;font-family:var(--serif);font-weight:500;font-size:20px;line-height:1.2;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.hsec h2 .link{font-family:var(--sans);padding:0}
+.hxs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.hx{display:flex;flex-direction:column;gap:2px;min-height:68px;justify-content:center;padding:12px 14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);transition:transform .15s var(--ease),background .15s}
+.hx:active{transform:scale(.97);background:var(--surface2)}
+.hx b{font-family:var(--serif);font-weight:500;font-size:18px;line-height:1.2}
+.hx span{font-size:12.5px;color:var(--muted)}
 
 /* ---------- login ---------- */
 .login{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding-top:calc(var(--sat) + 24px);padding-bottom:calc(var(--sab) + 24px)}

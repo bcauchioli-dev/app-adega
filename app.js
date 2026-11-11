@@ -3,7 +3,7 @@
 (function () {
 'use strict';
 
-var VERSION = '1.2.0';
+var VERSION = '1.3.0';
 var CFG = window.APP_CONFIG || {};
 var YEAR = new Date().getFullYear();
 var STYLE_ORDER = ['tinto', 'branco', 'rosé', 'espumante', 'doce/fortificado'];
@@ -405,6 +405,9 @@ function applyTheme() {
 if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (PREF.theme === 'system') applyTheme(); });
 
 /* ------------------------------------------------------------------ rotas, transições e voltar */
+var WIDE = window.matchMedia ? window.matchMedia('(min-width: 960px)') : null;
+function isWide() { return !!(WIDE && WIDE.matches); }
+if (WIDE && WIDE.addEventListener) WIDE.addEventListener('change', function () { render(); });
 var DEPTH = { home: 0, vinhos: 0, bar: 0, painel: 0, grupo: 1, busca: 1, historico: 1, vinho: 2 };
 function parseHash() {
   var h = location.hash.replace(/^#\/?/, '');
@@ -457,8 +460,16 @@ window.addEventListener('hashchange', function () {
   else if (navIntent === 'up') dir = 'back';
   else { dir = (DEPTH[next.name] || 0) <= (DEPTH[prev.name] || 0) ? 'back' : 'fwd'; if (dir === 'back') S.navDepth = Math.max(0, S.navDepth - 1); else S.navDepth++; }
   navIntent = null;
+  if (prev.name !== 'vinho') S.listRoute = prev;
   S.route = next;
   if (S.phase !== 'app') { if (hadLayer) closeLayerNow(); return render(); }
+  if (isWide() && (next.name === 'vinho' || (prev.name === 'vinho' && S.listRoute && routeKey(next) === routeKey(S.listRoute)))) {
+    if (hadLayer) closeLayerNow();
+    render();
+    var dp = document.getElementById('detail'); if (dp) dp.scrollTop = 0;
+    if (next.name === 'vinho') loadFicha(next.id); else if (next.name === 'busca') focusSoon('#q');
+    return;
+  }
   transition(dir, function () {
     if (hadLayer) closeLayerNow();
     render();
@@ -791,7 +802,7 @@ function viewHome() {
     ex('avaliacao', 'Avaliação', plural(avals, 'nível', 'níveis')) + ex('local', 'Local', plural(locais, 'local', 'locais')) + '</div></section>' : '';
   var feed = feedItems(D.movs, []).filter(function (it) { return !it.legado; }).slice(0, 3);
   var movs = feed.length ? '<section class="hsec"><h2>Últimos movimentos<a class="link" href="#/historico">Histórico</a></h2><div class="feed">' + feedHtml(feed, true) + '</div></section>' : '';
-  return head + '<main class="wrap content home">' + hero + stats + explorar + movs + '</main>';
+  return head + '<main class="wrap content home">' + hero + stats + '<div class="hcols">' + explorar + movs + '</div></main>';
 }
 function viewVinhos() {
   var head = topBar(btnMenu(), 'Vinhos', plural(countB(X.adega), 'garrafa', 'garrafas') + ' · ' + plural(X.adega.length, 'rótulo', 'rótulos'), btnSearch(), true);
@@ -1123,7 +1134,7 @@ function viewPainel() {
   var gp = groupsFor('pais', A).sort(function (a, b) { return b.n - a.n; }).slice(0, 8), mx = gp.length ? gp[0].n : 1;
   var bars = gp.map(function (g) { return '<a href="' + hrefGroup('pais', g.key) + '" style="display:contents"><span>' + esc(g.label) + '</span><span class="t"><i style="width:' + (100 * g.n / mx).toFixed(1) + '%"></i></span><span class="n"><b>' + g.n + '</b> · ' + Math.round(100 * g.n / (nA || 1)) + '%</span></a>'; }).join('');
   var cons = feedItems(D.movs.filter(function (m) { return m.tipo === 'consumo'; }), []).slice(0, 5);
-  return head + '<main class="wrap content"><div class="cards">' +
+  return head + '<main class="wrap content pgrid"><div class="cards">' +
     '<div class="card"><span class="k">Total</span><span class="v">' + nfmt(nA + nB) + '</span><span class="s">garrafas em estoque</span></div>' +
     '<a class="card" href="#/vinhos" data-a="tab" data-x="#/vinhos"><span class="k" style="color:var(--wine-fg)">Vinhos</span><span class="v">' + nfmt(nA) + '</span><span class="s">' + plural(A.length, 'rótulo', 'rótulos') + '</span></a>' +
     '<a class="card" href="#/bar" data-a="tab" data-x="#/bar"><span class="k">Bar e outros</span><span class="v">' + nfmt(nB) + '</span><span class="s">' + plural(B.length, 'item', 'itens') + '</span></a>' +
@@ -1268,14 +1279,14 @@ function modalHtml(m) {
   }
   return sheetOpen('') + sheetHd('') + SHEET_END;
 }
-function menuHtml() {
+function menuHtml(side) {
   var a = adegaAtual(), A = X.adega, B = X.bar;
   var ab = countB(A.filter(function (id) { return paraAbrir(prod(id)); }));
   var th = PREF.theme || 'dark', pl = papel();
   var adegasHtml = (S.me && S.me.is_admin && S.adegas.length) ? '<div class="dsec"><span class="lbl">Adegas</span>' + S.adegas.map(function (x) {
     return '<button class="adega-opt" type="button" data-a="adega" data-x="' + x.id + '" aria-current="' + (x.id === S.adegaId) + '"><i></i><span>' + esc(x.nome) + '</span><small>' + (x.garrafas ? plural(x.garrafas, 'garrafa', 'garrafas') : 'sem dados') + '</small></button>';
   }).join('') + '</div>' : '';
-  return '<div class="layer drawer"><div class="scrim" data-a="close"></div><aside role="dialog" aria-modal="true" aria-label="Menu" tabindex="-1" data-panel>' +
+  var body =
     '<div class="dsec" style="padding-top:20px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px"><div style="min-width:0"><div style="font-family:var(--serif);font-size:24px;line-height:1.15">' + esc(a ? a.nome : 'App Adega') + '</div><div class="hint" style="margin-top:2px">' + plural(countB(A) + countB(B), 'garrafa', 'garrafas') + ' · ' + plural(A.length + B.length, 'rótulo', 'rótulos') + '</div></div><button class="ib ghost" type="button" data-a="close" aria-label="Fechar menu" style="margin:-8px -10px 0 0">' + I.close + '</button></div></div>' +
     adegasHtml +
     '<div class="dsec"><span class="lbl">Adega</span>' +
@@ -1294,7 +1305,18 @@ function menuHtml() {
       '<button class="dlink" type="button" data-a="sync"><span>Atualizar dados</span>' + (S.ui.syncing ? '<span class="spin" aria-hidden="true"></span>' : I.refresh) + '</button>' +
       '<button class="dlink" type="button" data-a="sair"><span style="color:var(--wine-fg)">Sair</span>' + I.out + '</button></div>' +
     '<div class="dsec" style="border-bottom:0;margin-top:auto"><p class="hint" style="margin:0;font-size:12px">App Adega ' + VERSION + (S.ui.syncedAt ? ' · dados de ' + fmtTime(S.ui.syncedAt) : '') + '</p></div>' +
-    '</aside></div>';
+    '';
+  if (side) return body;
+  return '<div class="layer drawer"><div class="scrim" data-a="close"></div><aside role="dialog" aria-modal="true" aria-label="Menu" tabindex="-1" data-panel>' + body + '</aside></div>';
+}
+function sideHtml(lr) {
+  return '<div class="stools"><a class="ssearch" href="#/busca" data-a="newq">' + I.search + '<span>Buscar</span><kbd aria-hidden="true">/</kbd></a>' +
+    (canWrite() ? '<button class="btn primary" type="button" data-a="entrada" data-x="' + (lr.name === 'bar' || lr.secao === 'bar' ? 'bar' : '') + '">' + I.plus + 'Nova entrada</button>' : '') + '</div>' + menuHtml(true);
+}
+function routeHash(r) {
+  if (r.name === 'grupo') return hrefGroup(r.modo, r.chave, r.secao);
+  if (r.name === 'vinho') return '#/v/' + r.id;
+  return r.name === 'home' ? '#/' : '#/' + r.name;
 }
 function fotoHtml(m) {
   var p = prod(m.pid), u = fotoUrl(p), write = canWrite();
@@ -1311,13 +1333,16 @@ var shell = null;
 function ensureShell() {
   var app = document.getElementById('app');
   if (shell && document.getElementById('screen')) return;
-  app.innerHTML = '<div id="screen"></div><div id="dock"></div><div id="layer"></div><div class="toasts" id="toasts" aria-live="polite"></div>';
+  app.innerHTML = '<aside id="side" aria-label="Menu"></aside><div id="screen"></div><div id="detail"></div><div id="dock"></div><div id="layer"></div><div class="toasts" id="toasts" aria-live="polite"></div>';
   shell = true;
+  document.getElementById('detail').addEventListener('scroll', onScroll, { passive: true });
 }
 function render() {
   ensureShell();
   var screen = document.getElementById('screen'), dock = document.getElementById('dock');
   var html, showDock = false, r = S.route;
+  var wide = isWide() && S.phase === 'app', det = wide && r.name === 'vinho', lr = r;
+  if (det) { lr = S.listRoute || { name: (prod(r.id) && prod(r.id).secao === 'bar') ? 'bar' : 'vinhos' }; S.listRoute = lr; }
   if (S.phase === 'boot') html = '<div class="boot">Carregando…</div>';
   else if (S.phase === 'config') html = viewMessage('Configuração incompleta', 'Falta a chave pública do Supabase no arquivo config.js.');
   else if (S.phase === 'login') html = viewLogin();
@@ -1325,21 +1350,21 @@ function render() {
   else if (S.phase === 'noadega') html = viewMessage('Nenhuma adega ligada', 'Sua conta ainda não está ligada a nenhuma adega. Fale com quem administra o app.', '<button class="btn" type="button" data-a="sair">Sair</button>');
   else if (S.phase === 'erro') html = viewMessage('Não foi possível carregar', S.ui.bootErr || 'Tente de novo em instantes.', '<button class="btn primary" type="button" data-a="retry">Tentar de novo</button>');
   else {
-    if (r.name === 'home') { html = viewHome(); showDock = true; }
-    else if (r.name === 'vinhos') { html = viewVinhos(); showDock = true; }
-    else if (r.name === 'bar') { html = viewBar(); showDock = true; }
-    else if (r.name === 'painel') { html = viewPainel(); showDock = true; }
-    else if (r.name === 'grupo') html = viewGroup(r);
-    else if (r.name === 'vinho') html = viewFicha(r.id);
-    else if (r.name === 'busca') html = viewBusca();
-    else if (r.name === 'historico') html = viewHistorico();
+    if (lr.name === 'home') { html = viewHome(); showDock = true; }
+    else if (lr.name === 'vinhos') { html = viewVinhos(); showDock = true; }
+    else if (lr.name === 'bar') { html = viewBar(); showDock = true; }
+    else if (lr.name === 'painel') { html = viewPainel(); showDock = true; }
+    else if (lr.name === 'grupo') html = viewGroup(lr);
+    else if (lr.name === 'vinho') html = viewFicha(lr.id);
+    else if (lr.name === 'busca') html = viewBusca();
+    else if (lr.name === 'historico') html = viewHistorico();
     else html = viewHome();
   }
-  var screenKey = S.phase + ':' + routeKey(r);
+  var screenKey = S.phase + ':' + routeKey(lr);
   if (screen.getAttribute('data-route') !== screenKey) { screen.setAttribute('data-route', screenKey); screen.innerHTML = strip(html); }
   else morph(screen, html);
   var dockHtml = '';
-  if (showDock) {
+  if (showDock && !wide) {
     var t = r.name, bar = t === 'bar';
     dockHtml = '<div class="dock"><nav aria-label="Seções">' +
       '<a href="#/" data-a="tab" data-x="#/"' + (t === 'home' ? ' aria-current="page"' : '') + '>' + I.home + 'Início</a>' +
@@ -1347,16 +1372,35 @@ function render() {
       '<a href="#/bar" data-a="tab" data-x="#/bar"' + (bar ? ' aria-current="page"' : '') + '>' + I.bar + 'Bar</a>' +
       '<a href="#/painel" data-a="tab" data-x="#/painel"' + (t === 'painel' ? ' aria-current="page"' : '') + '>' + I.chart + 'Painel</a></nav>' +
       (canWrite() ? '<button class="fab" type="button" data-a="entrada" data-x="' + (bar ? 'bar' : '') + '" aria-label="' + (bar ? 'Nova entrada no bar' : 'Nova entrada de vinho') + '">' + I.plus + '</button>' : '') + '</div>';
-  } else if (S.phase === 'app' && r.name === 'vinho') dockHtml = fichaActions(r.id);
+  } else if (S.phase === 'app' && r.name === 'vinho' && !wide) dockHtml = fichaActions(r.id);
   morph(dock, dockHtml);
+  var root = document.documentElement, dEl = document.getElementById('detail'), sEl = document.getElementById('side');
+  root.classList.toggle('sideon', wide); root.classList.toggle('detailon', det);
+  var dHtml = det ? viewFicha(r.id).replace('id="top"', 'id="dtop"').replace(I.back, I.close).replace('aria-label="Voltar"', 'aria-label="Fechar ficha"') + fichaActions(r.id) : '';
+  var dKey = det ? r.id : '';
+  if (dEl.getAttribute('data-id') !== dKey) { dEl.setAttribute('data-id', dKey); dEl.innerHTML = strip(dHtml); } else morph(dEl, dHtml);
+  morph(sEl, wide ? sideHtml(lr) : '');
+  if (wide) {
+    var cur = routeHash(lr), selHash = det ? '#/v/' + r.id : '';
+    Array.prototype.forEach.call(sEl.querySelectorAll('a.dlink'), function (a) { if (a.getAttribute('href') === cur) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
+    Array.prototype.forEach.call(screen.querySelectorAll('a[href^="#/v/"]'), function (a) { a.classList.toggle('sel', a.getAttribute('href') === selHash); });
+  }
   if (S.modal) renderLayer();
   onScroll();
 }
 function onScroll() {
-  var t = document.getElementById('top'); if (!t) return;
-  t.classList.toggle('scrolled', window.scrollY > 4);
-  var h = t.querySelector('.h1') && document.querySelector('.hero h1');
-  if (h) t.classList.toggle('show-title', h.getBoundingClientRect().bottom < t.getBoundingClientRect().bottom - 4);
+  var t = document.getElementById('top');
+  if (t) {
+    t.classList.toggle('scrolled', window.scrollY > 4);
+    var h = t.querySelector('.h1') && document.querySelector('#screen .hero h1');
+    if (h) t.classList.toggle('show-title', h.getBoundingClientRect().bottom < t.getBoundingClientRect().bottom - 4);
+  }
+  var d = document.getElementById('dtop'), pane = document.getElementById('detail');
+  if (d && pane) {
+    d.classList.toggle('scrolled', pane.scrollTop > 4);
+    var dh = pane.querySelector('.hero h1');
+    if (dh) d.classList.toggle('show-title', dh.getBoundingClientRect().bottom < d.getBoundingClientRect().bottom - 4);
+  }
 }
 window.addEventListener('scroll', onScroll, { passive: true });
 
@@ -1630,6 +1674,7 @@ document.addEventListener('click', function (ev) {
     if (aact === 'vermodo') { S.ui.ver = a.getAttribute('data-x'); PREF.ver = S.ui.ver; savePref(); navIntent = 'tab'; location.replace(href); return; }
     if (aact === 'tab') { if (m) leaveModal(function () { goTab(href); }); else goTab(href); return; }
     if (sameHash(href)) { if (m) closeModal(); else window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    if (!m && isWide() && S.route.name === 'vinho' && href.indexOf('#/v/') === 0) { navIntent = 'tab'; location.replace(href); return; }
     if (m) leaveModal(function () { go(href); }); else go(href);
     return;
   }
@@ -1705,7 +1750,13 @@ document.addEventListener('submit', function (ev) {
     .catch(function (e) { S.ui.loginBusy = false; S.ui.loginErr = e.message; render(); var pw = document.getElementById('l-senha'); if (pw) { pw.select && pw.select(); } });
 });
 document.addEventListener('keydown', function (ev) {
-  if (ev.key === 'Escape' && S.modal) closeModal();
+  if (ev.key === 'Escape' && S.modal) { closeModal(); return; }
+  if (ev.key === 'Escape' && isWide() && S.phase === 'app' && S.route.name === 'vinho') { goBack(routeHash(S.listRoute || { name: 'vinhos' })); return; }
+  if (ev.key === '/' && S.phase === 'app' && !S.modal && !ev.metaKey && !ev.ctrlKey && !/^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) {
+    ev.preventDefault();
+    if (S.route.name === 'busca') focusSoon('#q'); else go('#/busca');
+    return;
+  }
   if (ev.key === 'Enter' && ev.target.id === 'q') ev.target.blur();
 });
 window.addEventListener('online', function () { S.ui.offline = false; render(); if (S.phase === 'app') sync(true); });

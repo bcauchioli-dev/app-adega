@@ -3,7 +3,7 @@
 (function () {
 'use strict';
 
-var VERSION = '1.6.0';
+var VERSION = '1.7.0';
 var CFG = window.APP_CONFIG || {};
 var YEAR = new Date().getFullYear();
 var STYLE_ORDER = ['tinto', 'branco', 'rosé', 'espumante', 'doce/fortificado'];
@@ -801,7 +801,7 @@ function offlineBar() {
 function seg(name, opts, cur) {
   return '<div class="seg" role="group" aria-label="Ver por">' + opts.map(function (o) { return '<button type="button" data-a="' + name + '" data-x="' + o[0] + '" aria-pressed="' + (cur === o[0]) + '">' + esc(o[1]) + '</button>'; }).join('') + '</div>';
 }
-function skeletonRows(n) { var s = ''; for (var i = 0; i < n; i++) s += '<div class="sk" style="height:64px;margin-top:8px"></div>'; return s; }
+function skeletonRows(n) { var s = ''; for (var i = 0; i < n; i++) s += '<div class="sk" style="height:64px;margin-top:var(--space-2)"></div>'; return s; }
 function emptyState(title, text, cta) { return '<div class="empty"><h2>' + esc(title) + '</h2><p>' + esc(text) + '</p>' + (cta || '') + '</div>'; }
 
 /* ------------------------------------------------------------------ telas */
@@ -817,8 +817,8 @@ function viewLogin() {
     '</form><p class="foot">Problemas para entrar? Fale com quem administra a sua adega.</p></main>';
 }
 function viewLoading() {
-  return '<header class="top"><div class="top-in wrap"><div class="sk" style="width:44px;height:44px;border-radius:22px"></div><div class="ttl"><div class="sk" style="width:60%;height:20px"></div><div class="sk" style="width:80%;height:13px;margin-top:6px"></div></div></div></header>' +
-    '<main class="wrap content"><div class="sk" style="height:58px;margin-top:6px"></div><div class="tiles"><div class="sk" style="height:70px"></div><div class="sk" style="height:70px"></div><div class="sk" style="height:70px"></div></div>' + skeletonRows(6) + '</main>';
+  return '<header class="top"><div class="top-in wrap"><div class="sk" style="width:44px;height:44px;border-radius:22px"></div><div class="ttl"><div class="sk" style="width:60%;height:20px"></div><div class="sk" style="width:80%;height:13px;margin-top:var(--space-2)"></div></div></div></header>' +
+    '<main class="wrap content"><div class="sk" style="height:58px;margin-top:var(--space-2)"></div><div class="tiles"><div class="sk" style="height:70px"></div><div class="sk" style="height:70px"></div><div class="sk" style="height:70px"></div></div>' + skeletonRows(6) + '</main>';
 }
 function viewMessage(title, text, cta) { return '<main class="wrap login">' + emptyState(title, text, cta) + '</main>'; }
 
@@ -877,13 +877,13 @@ function viewVinhos() {
   var mode = S.ui.ver;
   var groups = groupsFor(mode, X.adega);
   var list = '<div class="glist">' + groups.map(function (g) {
-    return '<a class="grow" data-k="' + esc(mode + ':' + g.key) + '" href="' + hrefGroup(mode, g.key) + '" aria-label="' + esc(g.label + ', ' + plural(g.n, 'garrafa', 'garrafas')) + '">' + (g.color ? '<span class="dot" style="background:' + g.color + '"></span>' : '') +
+    return '<a class="grow" data-k="' + esc(mode + ':' + g.key) + '" href="' + hrefGroup(mode, g.key) + '">' + (g.color ? '<span class="dot" style="background:' + g.color + '"></span>' : '') +
       '<span class="gt"><span class="gn">' + esc(g.label) + '</span></span>' +
-      '<span class="gc">' + nfmt(g.n) + '</span><span class="chev">' + I.chev + '</span></a>';
+      '<span class="gc">' + nfmt(g.n) + '<span class="sr"> ' + (g.n === 1 ? 'garrafa' : 'garrafas') + '</span></span><span class="chev">' + I.chev + '</span></a>';
   }).join('') + '</div>';
   return head + '<main class="wrap content">' + noticeHtml() + (X.adega.length ? tiles : '') +
     '<p class="sect-label">Vinhos · ' + plural(countB(X.adega), 'garrafa', 'garrafas') + '</p>' +
-    seg('ver', [['pais', 'País'], ['avaliacao', 'Avaliação'], ['tipo', 'Tipo'], ['local', 'Local']], mode) + (X.adega.length ? list : '<p class="hint" style="padding:16px 4px">Nenhum vinho em estoque.</p>') + '</main>';
+    seg('ver', [['pais', 'País'], ['avaliacao', 'Avaliação'], ['tipo', 'Tipo'], ['local', 'Local']], mode) + (X.adega.length ? list : '<p class="hint" style="padding:var(--space-4) var(--space-1)">Nenhum vinho em estoque.</p>') + '</main>';
 }
 function viewBar() {
   var a = adegaAtual();
@@ -891,7 +891,7 @@ function viewBar() {
   if (!X.bar.length) return head + '<main class="wrap content">' + emptyState('Bar vazio', 'Nenhum destilado ou outro item cadastrado em ' + (a ? a.nome : 'esta adega') + '.', canWrite() ? '<button class="btn primary" type="button" data-a="entrada" data-x="bar">Registrar entrada no bar</button>' : '') + '</main>';
   var mode = S.ui.barVer;
   var groups = groupsFor(mode, X.bar);
-  return head + '<main class="wrap content"><p class="sect-label" style="margin-top:14px">Ver por</p>' + seg('barver', [['cat', 'Categoria'], ['local', 'Local']], mode) +
+  return head + '<main class="wrap content"><p class="sect-label" style="margin-top:var(--space-4)">Ver por</p>' + seg('barver', [['cat', 'Categoria'], ['local', 'Local']], mode) +
     '<div class="glist">' + groups.map(function (g) {
       return '<a class="grow" data-k="' + esc(mode + ':' + g.key) + '" href="' + hrefGroup(mode, g.key, 'bar') + '" aria-label="' + esc(g.label + ', ' + plural(g.n, 'garrafa', 'garrafas')) + '"><span class="gt"><span class="gn">' + esc(g.label) + '</span></span><span class="gc">' + nfmt(g.n) + '</span><span class="chev">' + I.chev + '</span></a>';
     }).join('') + '</div></main>';
@@ -1009,7 +1009,7 @@ function viewFicha(id) {
   var line2 = [p.produtor, [p.regiao, p.pais].filter(Boolean).join(', ')].filter(Boolean).join(' · ');
   var line3 = [safra(p), p.secao === 'bar' ? p.categoria : STYLE_ONE[p.estilo], p.volume_ml ? (p.volume_ml >= 1000 ? (p.volume_ml / 1000).toLocaleString('pt-BR') + ' L' : p.volume_ml + ' ml') : ''].filter(Boolean).join(' · ');
   var u = fotoUrl(p), c = STYLE_COLOR[p.estilo] || '#8C948E';
-  var photo = '<button class="photo" type="button" data-a="foto" data-x="' + id + '" aria-label="' + (u ? 'Ampliar foto' : 'Foto da garrafa') + '">' +
+  var photo = '<button class="photo" type="button" data-a="foto" data-x="' + id + '" ' + (u ? ' aria-label="Ampliar foto"' : '') + '>' +
     (u ? '<img src="' + esc(u) + '" alt="Foto da garrafa">' : '<span class="band" style="background:' + c + '"></span>' + I.img + '<span>' + (write ? 'Adicionar foto' : 'Sem foto') + '</span>') + '</button>';
   var groups = locGroups(gs);
   var slots = gs.length ? '<div class="slots">' + groups.map(function (g) { var L = g.L; var nm = !L ? 'Sem local' : (isNicho(L) ? pad(nichoNum(L)) : L.nome); return '<span class="slot">' + esc(nm) + (g.gs.length > 1 ? '<small>×' + g.gs.length + '</small>' : '') + '</span>'; }).join('') + '</div>' : '<p>Nenhuma garrafa em estoque.</p>';
@@ -1049,7 +1049,7 @@ function viewFicha(id) {
     '<section class="sec"><div class="sec-h"><h2>' + plural(gs.length, 'garrafa', 'garrafas') + (gs.length ? ' · ' + esc(locLabel(gs, true)) : '') + '</h2>' + (write ? '<button class="link" type="button" data-a="adicionar" data-x="' + id + '">+ Adicionar</button>' : '') + '</div>' + slots + '</section>' +
     win + '<section class="sec">' + kv + '</section>' +
     '<section class="sec"><h2>Histórico</h2>' + hist + '</section>' +
-    (!canWrite() ? '<p class="hint" style="padding:8px 0 24px">Seu acesso é somente de consulta.</p>' : '') + '</main>';
+    (!canWrite() ? '<p class="hint" style="padding:var(--space-2) 0 var(--space-5)">Seu acesso é somente de consulta.</p>' : '') + '</main>';
 }
 function fichaActions(id) {
   var p = prod(id);
@@ -1133,14 +1133,14 @@ function buscar(q) {
 }
 function viewBusca() {
   var q = norm(S.ui.q).trim();
-  var head = '<header class="top" id="top"><div class="top-in wrap"><label class="search">' + I.search + '<span class="sr">Buscar na adega</span><input id="q" type="search" enterkeyhint="search" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Vinho, produtor, nicho, nota…" value="' + esc(S.ui.q) + '"></label><button class="pill" type="button" style="border:0;background:none;padding:0 4px" data-a="back" data-x="#/">Cancelar</button></div>' + offlineBar() + '</header>';
+  var head = '<header class="top" id="top"><h1 class="sr">Buscar na adega</h1><div class="top-in wrap"><label class="search">' + I.search + '<span class="sr">Buscar na adega</span><input id="q" type="search" enterkeyhint="search" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Vinho, produtor, nicho, nota…" value="' + esc(S.ui.q) + '"></label><button class="pill" type="button" style="border:0;background:none;padding:0 var(--space-1)" data-a="back" data-x="#/">Cancelar</button></div>' + offlineBar() + '</header>';
   var body;
   if (!q) {
     var all = X.adega.concat(X.bar), nsl = 0, ret = null, nret = 0;
     D.locais.forEach(function (L) { if (/^retirada/i.test(L.nome)) ret = L; });
     D.garrafas.forEach(function (g) { if (g.status !== 'em_estoque') return; if (!g.local_id) nsl++; if (ret && g.local_id === ret.id) nret++; });
     var recent = (PREF.buscas || []).slice(0, 5);
-    body = '<p class="hint" style="margin:4px 0 16px">Busca em tudo: nome, produtor, região, país, tipo, safra, nicho, local, notas e ocasiões de consumo.</p>' +
+    body = '<p class="hint" style="margin:var(--space-1) 0 var(--space-4)">Busca em tudo: nome, produtor, região, país, tipo, safra, nicho, local, notas e ocasiões de consumo.</p>' +
       '<p class="sect-label" style="margin-top:0">Atalhos</p><div class="tiles" style="grid-template-columns:repeat(2,minmax(0,1fr))">' +
       '<a class="tile gold" href="' + hrefGroup('abrir', 'todos') + '"><b>' + countB(X.adega.filter(function (id) { return paraAbrir(prod(id)); })) + '</b><span>Para abrir logo</span></a>' +
       (ret ? '<a class="tile" href="' + hrefGroup('local', 'a:' + ret.id) + '"><b>' + nret + '</b><span>' + esc(ret.nome) + '</span></a>' : '') +
@@ -1172,9 +1172,9 @@ function viewBusca() {
     var titulo = filtro === 'fora' ? plural(R.fora.length, 'rótulo já consumido', 'rótulos já consumidos') : plural(R.estoque.length, 'resultado', 'resultados') + ' · ' + plural(tot, 'garrafa', 'garrafas');
     if (!R.estoque.length && !R.fora.length && !R.grupos.length) body = emptyState('Nada encontrado', 'Nada para “' + S.ui.q + '”. Tente o produtor, a região ou o número do nicho.');
     else body = chips + atalhos +
-      (lista.length ? '<p class="sect-label"' + (atalhos || chips ? '' : ' style="margin-top:4px"') + '>' + titulo + (R.aprox ? ' · grafia parecida' : '') + '</p>' + rows +
+      (lista.length ? '<p class="sect-label"' + (atalhos || chips ? '' : ' style="margin-top:var(--space-1)"') + '>' + titulo + (R.aprox ? ' · grafia parecida' : '') + '</p>' + rows +
         (lista.length > 80 ? '<p class="hint">Mostrando 80 de ' + lista.length + '. Refine a busca.</p>' : '')
-        : '<p class="hint" style="padding:16px 0">Nenhum item em estoque para “' + esc(S.ui.q) + '”.' + (R.fora.length ? ' Veja em “Já consumidos”.' : '') + '</p>');
+        : '<p class="hint" style="padding:var(--space-4) 0">Nenhum item em estoque para “' + esc(S.ui.q) + '”.' + (R.fora.length ? ' Veja em “Já consumidos”.' : '') + '</p>');
   }
   return head + '<main class="wrap content">' + body + '</main>';
 }
@@ -1198,7 +1198,7 @@ function viewPainel() {
     (nA ? '<section class="panel"><h2>Janela de consumo em ' + YEAR + '<small>garrafas de vinho</small></h2><div class="stack" role="img" aria-label="Garrafas por situação da janela de consumo">' + stackH + '</div><div class="legend">' + leg + '</div></section>' +
     '<section class="panel"><h2>Vinhos por país<small>garrafas</small></h2><div class="bars">' + bars + '</div></section>' : '') +
     '<section class="panel"><h2>Últimos consumos<a class="link" href="#/historico">Ver histórico</a></h2>' + (cons.length ? '<div class="feed">' + feedHtml(cons, true) + '</div>' : '<p class="hint">Nenhum consumo registrado ainda. Na ficha de um vinho, toque em “Abrir uma garrafa”.</p>') + '</section>' +
-    '<p class="hint" style="padding:16px 2px 0">Dados de ' + (S.ui.syncedAt ? fmtDate(S.ui.syncedAt) + ', ' + fmtTime(S.ui.syncedAt) : '—') + '.</p></main>';
+    '<p class="hint" style="padding:var(--space-4) 2px 0">Dados de ' + (S.ui.syncedAt ? fmtDate(S.ui.syncedAt) + ', ' + fmtTime(S.ui.syncedAt) : '—') + '.</p></main>';
 }
 function newsCard(o, adm) {
   var n = o.n, l = o.l, onde = S.me && S.me.is_admin ? 'Nesta adega' : 'Na sua adega', liga = '';
@@ -1222,7 +1222,7 @@ function viewNoticias() {
   var head = topBar(btnBack('#/'), 'Do mundo do vinho', (adegaAtual() || {}).nome, '', true);
   if (!adm) {
     var vis = noticiasDaAdega();
-    return head + '<main class="wrap content">' + (vis.length ? '<div class="nlist" style="margin-top:14px">' + vis.map(function (o) { return newsCard(o); }).join('') + '</div><p class="hint" style="padding:18px 2px 0">Notícias escolhidas pela administração, ligadas aos rótulos desta adega. O título abre a matéria na fonte.</p>'
+    return head + '<main class="wrap content">' + (vis.length ? '<div class="nlist" style="margin-top:var(--space-4)">' + vis.map(function (o) { return newsCard(o); }).join('') + '</div><p class="hint" style="padding:var(--space-4) 2px 0">Notícias escolhidas pela administração, ligadas aos rótulos desta adega. O título abre a matéria na fonte.</p>'
       : emptyState('Nenhuma notícia por enquanto', 'Quando sair algo sobre os vinhos desta adega, aparece aqui.')) + '</main>';
   }
   var card = function (n) { return newsCard({ n: n, l: ligacao(n.termos) }, true); };
@@ -1244,7 +1244,7 @@ function viewHistorico() {
   var head = topBar(btnBack('#/painel'), 'Histórico', (adegaAtual() || {}).nome, '', true);
   var items = feedItems(D.movs, D.alts);
   return head + '<main class="wrap content">' + (items.length ? '<div class="feed">' + feedHtml(items, true) + '</div>' : emptyState('Sem registros ainda', 'Consumos, entradas, mudanças de lugar e edições aparecem aqui, com data e autor.')) +
-    '<p class="hint" style="padding:18px 0 0">A base inicial veio da planilha AppSheet. Cada registro novo mostra data, hora e quem fez.</p></main>';
+    '<p class="hint" style="padding:var(--space-4) 0 0">A base inicial veio da planilha AppSheet. Cada registro novo mostra data, hora e quem fez.</p></main>';
 }
 
 /* ------------------------------------------------------------------ menu e folhas */
@@ -1305,7 +1305,7 @@ function dupProduto(d) {
   return r;
 }
 function sheetHd(t, serif) { return '<div class="hd"><h2' + (serif ? ' class="serif"' : '') + '>' + esc(t) + '</h2><button class="ib ghost" type="button" data-a="close" aria-label="Fechar">' + I.close + '</button></div>'; }
-function summary(p, meta) { return '<div class="summary">' + thumb(p) + '<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px"><span class="nm">' + esc(p.nome) + '</span><span class="meta">' + esc(meta) + '</span></span></div>'; }
+function summary(p, meta) { return '<div class="summary">' + thumb(p) + '<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--space-1)"><span class="nm">' + esc(p.nome) + '</span><span class="meta">' + esc(meta) + '</span></span></div>'; }
 function busyBtn(action, label, busyLabel, cls) { var b = S.busy === action; return '<button class="btn primary block ' + (cls || '') + '" type="button" data-a="' + action + '"' + (b ? ' disabled' : '') + '>' + (b ? '<span class="spin" aria-hidden="true"></span>' + esc(busyLabel) : esc(label)) + '</button>'; }
 function field(label, name, val, attrs) { return '<label class="fld">' + esc(label) + '<input data-f="' + name + '" value="' + esc(val == null ? '' : val) + '" ' + (attrs || '') + '></label>'; }
 function errLine(m) { return m.err ? '<p class="err" role="alert">' + esc(m.err) + '</p>' : ''; }
@@ -1475,7 +1475,7 @@ function menuHtml(side) {
     return '<button class="adega-opt" type="button" data-a="adega" data-x="' + x.id + '" aria-current="' + (x.id === S.adegaId) + '"><i></i><span>' + esc(x.nome) + '</span><small>' + (x.garrafas ? plural(x.garrafas, 'garrafa', 'garrafas') : 'sem dados') + '</small></button>';
   }).join('') + '</div>' : '';
   var body =
-    '<div class="dsec" style="padding-top:20px"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px"><div style="min-width:0"><div style="font-family:var(--serif);font-size:24px;line-height:1.15">' + esc(a ? a.nome : 'App Adega') + '</div><div class="hint" style="margin-top:2px">' + plural(countB(A) + countB(B), 'garrafa', 'garrafas') + ' · ' + plural(A.length + B.length, 'rótulo', 'rótulos') + '</div></div><button class="ib ghost" type="button" data-a="close" aria-label="Fechar menu" style="margin:-8px -10px 0 0">' + I.close + '</button></div></div>' +
+    '<div class="dsec" style="padding-top:var(--space-5)"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-3)"><div style="min-width:0"><div style="font-family:var(--serif);font-size:24px;line-height:1.15">' + esc(a ? a.nome : 'App Adega') + '</div><div class="hint" style="margin-top:2px">' + plural(countB(A) + countB(B), 'garrafa', 'garrafas') + ' · ' + plural(A.length + B.length, 'rótulo', 'rótulos') + '</div></div><button class="ib ghost" type="button" data-a="close" aria-label="Fechar menu" style="margin:calc(var(--space-2) * -1) calc(var(--space-3) * -1) 0 0">' + I.close + '</button></div></div>' +
     adegasHtml +
     '<div class="dsec"><span class="lbl">Adega</span>' +
       '<a class="dlink" href="#/" data-a="tab" data-x="#/"><span>Início</span></a>' +
@@ -1489,14 +1489,14 @@ function menuHtml(side) {
       (S.me && S.me.is_admin ? '<button class="dlink" type="button" data-a="fotoslote"><span>Importar fotos do AppSheet</span>' + I.img + '</button>' : '') +
     '</div>' +
     '<div class="dsec"><span class="lbl">Aparência</span>' + seg('theme', [['system', 'Sistema'], ['dark', 'Escuro'], ['light', 'Claro']], th) + '</div>' +
-    '<div class="dsec"><span class="lbl">Conta</span><div class="me" style="padding:6px 0 8px"><span class="av">' + esc((meuNome() || '?').charAt(0).toUpperCase()) + '</span><span style="min-width:0;display:flex;flex-direction:column;gap:2px"><b style="font-size:14.5px">' + esc(meuNome()) + '</b><span class="hint" style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis">' + esc(S.me ? S.me.email : '') + '</span></span><span class="role" style="margin-left:auto">' + esc(PAPEL_NOME[pl] || '—') + '</span></div>' +
+    '<div class="dsec"><span class="lbl">Conta</span><div class="me" style="padding:var(--space-2) 0 var(--space-2)"><span class="av">' + esc((meuNome() || '?').charAt(0).toUpperCase()) + '</span><span style="min-width:0;display:flex;flex-direction:column;gap:2px"><b style="font-size:14.5px">' + esc(meuNome()) + '</b><span class="hint" style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis">' + esc(S.me ? S.me.email : '') + '</span></span><span class="role" style="margin-left:auto">' + esc(PAPEL_NOME[pl] || '—') + '</span></div>' +
       '<button class="dlink" type="button" data-a="senha"><span>Trocar senha</span>' + I.key + '</button>' +
       '<button class="dlink" type="button" data-a="sync"><span>Atualizar dados</span>' + (S.ui.syncing ? '<span class="spin" aria-hidden="true"></span>' : I.refresh) + '</button>' +
       '<button class="dlink" type="button" data-a="sair"><span style="color:var(--wine-fg)">Sair</span>' + I.out + '</button></div>' +
     '<div class="dsec" style="border-bottom:0;margin-top:auto"><p class="hint" style="margin:0;font-size:12px">App Adega ' + VERSION + (S.ui.syncedAt ? ' · dados de ' + fmtTime(S.ui.syncedAt) : '') + '</p></div>' +
     '';
   if (side) return body;
-  return '<div class="layer drawer"><div class="scrim" data-a="close"></div><aside role="dialog" aria-modal="true" aria-label="Menu" tabindex="-1" data-panel>' + body + '</aside></div>';
+  return '<div class="layer drawer"><div class="scrim" data-a="close"></div><div class="dpan" role="dialog" aria-modal="true" aria-label="Menu" tabindex="-1" data-panel>' + body + '</div></div>';
 }
 function sideHtml(lr) {
   return '<div class="stools"><a class="ssearch" href="#/busca" data-a="newq">' + I.search + '<span>Buscar</span><kbd aria-hidden="true">/</kbd></a>' +
@@ -1511,7 +1511,7 @@ function fotoHtml(m) {
   var p = prod(m.pid), u = fotoUrl(p), write = canWrite();
   var busy = S.busy === 'foto';
   return '<div class="layer viewer"><div class="scrim"></div><div class="vin" role="dialog" aria-modal="true" aria-label="Foto da garrafa" tabindex="-1" data-panel>' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><span style="font-family:var(--serif);font-size:19px;min-width:0">' + esc(p.nome) + (p.safra ? ' ' + p.safra : '') + '</span><button class="ib" type="button" data-a="close" aria-label="Fechar foto" style="background:#171B1A;border-color:#262C2A;color:#EEEAE2">' + I.close + '</button></div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-3)"><span style="font-family:var(--serif);font-size:19px;min-width:0">' + esc(p.nome) + (p.safra ? ' ' + p.safra : '') + '</span><button class="ib" type="button" data-a="close" aria-label="Fechar foto" style="background:#171B1A;border-color:#262C2A;color:#EEEAE2">' + I.close + '</button></div>' +
     '<div class="pic">' + (u ? '<img src="' + esc(u) + '" alt="Foto da garrafa">' : '<div class="ph">' + I.img + '<span>' + (write ? 'Ainda sem foto. Tire uma foto da garrafa ou do rótulo.' : 'Ainda sem foto.') + '</span></div>') + '</div>' +
     (write ? '<label class="btn block" for="f-foto" style="background:#171B1A;border-color:#262C2A;color:#EEEAE2' + (busy ? ';opacity:.6;pointer-events:none' : '') + '">' + (busy ? '<span class="spin" aria-hidden="true"></span>Enviando foto…' : I.camera + (u ? 'Trocar foto' : 'Adicionar foto')) + '</label><input id="f-foto" class="sr" type="file" accept="image/*" data-p="' + p.id + '">' : '') +
     errLine(m) + '</div></div>';

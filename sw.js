@@ -1,7 +1,7 @@
 /* App Adega · service worker
    Guarda o próprio app (HTML, código, fontes e ícones) para abrir mesmo sem internet.
    Os dados vêm sempre do Supabase; a cópia offline dos dados fica no próprio app. */
-var VERSION = '1.6.0';
+var VERSION = '1.7.0';
 var CACHE = 'adega-' + VERSION;
 var SHELL = ['./', './app.js', './config.js', './manifest.webmanifest',
   './fonts/spectral-400.woff2', './fonts/spectral-500.woff2', './fonts/manrope-var.woff2',

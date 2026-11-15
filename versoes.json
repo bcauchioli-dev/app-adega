@@ -1,12 +1,20 @@
 {
   "proximas": [
-    "Adegas do Jorge e da Flavia no app.",
     "Regiões padronizadas, para navegar por região dentro de cada país.",
     "Fotos dos destilados.",
     "Relatórios da adega e valor estimado dos vinhos.",
     "Tela para organizar os locais e nichos."
   ],
   "versoes": [
+    {
+      "versao": "1.8.1",
+      "data": "2026-11-15",
+      "titulo": "Ajustes na tela Sobre",
+      "mudancas": [
+        "As versões anteriores ficam recolhidas; toque para abrir.",
+        "Títulos com a cor dourada do app."
+      ]
+    },
     {
       "versao": "1.8.0",
       "data": "2026-11-15",

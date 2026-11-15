@@ -3,7 +3,7 @@
 (function () {
 'use strict';
 
-var VERSION = '1.8.0';
+var VERSION = '1.8.1';
 var CFG = window.APP_CONFIG || {};
 var YEAR = new Date().getFullYear();
 var STYLE_ORDER = ['tinto', 'branco', 'rosé', 'espumante', 'doce/fortificado'];
@@ -1449,7 +1449,7 @@ function viewSobre() {
   return head + '<main class="wrap content sobre">' +
     (atual ? '<section class="panel"><h2>Nesta versão<small>' + esc(atual.versao) + (atual.data ? ' · ' + esc(fmtDia(atual.data)) : '') + '</small></h2>' + (atual.titulo ? '<p class="vt">' + esc(atual.titulo) + '</p>' : '') + li(atual.mudancas) + '</section>' : '') +
     ((v.proximas || []).length ? '<section class="panel"><h2>Próximas versões</h2>' + li(v.proximas) + '</section>' : '') +
-    (outras.length ? '<section class="panel"><h2>Versões anteriores</h2>' + outras.map(function (x) { return '<div class="vold"><p class="vt">' + esc(x.versao) + (x.data ? ' · ' + esc(fmtDia(x.data)) : '') + (x.titulo ? ' · ' + esc(x.titulo) : '') + '</p>' + li(x.mudancas) + '</div>'; }).join('') + '</section>' : '') +
+    (outras.length ? '<section class="panel"><button class="disc vdisc" type="button" data-a="vant" aria-expanded="' + !!S.ui.vant + '"><span>Versões anteriores · ' + outras.length + '</span>' + I.chev + '</button>' + (!S.ui.vant ? '' : outras.map(function (x) { return '<div class="vold"><p class="vt"><b>' + esc(x.versao) + '</b>' + (x.data ? ' · ' + esc(fmtDia(x.data)) : '') + (x.titulo ? ' · ' + esc(x.titulo) : '') + '</p>' + li(x.mudancas) + '</div>'; }).join('')) + '</section>' : '') +
     '<p class="hint" style="padding:var(--space-4) 2px 0">Tem uma ideia ou algo atrapalhou? Use o menu › Enviar sugestão.</p></main>';
 }
 function viewHistorico() {
@@ -2304,6 +2304,7 @@ document.addEventListener('click', function (ev) {
     case 'sugerir': if (!guardOnline()) break; if (m) { leaveModal(function () { openModal({ kind: 'sugerir', draft: {} }); }); } else openModal({ kind: 'sugerir', draft: {} }); break;
     case 'dosugerir': doSugerir(); break;
     case 'sgf': S.ui.sgf = x; render(); break;
+    case 'vant': S.ui.vant = !S.ui.vant; render(); break;
     case 'sugestao': if (!guardOnline()) break; var sg = D.sugs.filter(function (q) { return q.id === x; })[0]; if (sg) openModal({ kind: 'sugestao', draft: { id: sg.id, texto: sg.texto, status: sg.status, nota: sg.nota_interna || '' } }); break;
     case 'pickstatus': if (m) { m.draft.status = x; renderLayer(); } break;
     case 'dosugestao': doSugestao(); break;

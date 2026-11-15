@@ -1,0 +1,89 @@
+{
+  "proximas": [
+    "Adegas do Jorge e da Flavia no app.",
+    "Regiões padronizadas, para navegar por região dentro de cada país.",
+    "Fotos dos destilados.",
+    "Relatórios da adega e valor estimado dos vinhos.",
+    "Tela para organizar os locais e nichos."
+  ],
+  "versoes": [
+    {
+      "versao": "1.8.0",
+      "data": "2026-11-15",
+      "titulo": "Versão de teste",
+      "mudancas": [
+        "Ao abrir uma garrafa, o nicho fica livre na hora e aparece primeiro entre os nichos livres da Nova entrada.",
+        "O botão + de nova entrada aparece também dentro de um país e das outras listas; dentro de um país, já vem com o país preenchido.",
+        "Nova seção Consumidos no menu: tudo o que foi aberto, com data, quem registrou e de onde saiu.",
+        "O aviso da janela de consumo ficou discreto: um ponto âmbar ao lado do nome e uma linha informativa na ficha.",
+        "Os campos preenchidos pela leitura do rótulo ficam marcados em dourado até você conferir ou editar.",
+        "As seções recolhidas dos formulários ganharam uma seta, para ficar claro que abrem.",
+        "Topo do início e menu lateral mais leves no celular; o item da tela aberta fica marcado no menu.",
+        "Enviar sugestão: mande ideias e problemas direto pelo menu.",
+        "Sobre o app: esta tela, com o que mudou em cada versão."
+      ]
+    },
+    {
+      "versao": "1.7.0",
+      "data": "2026-11-12",
+      "titulo": "Espaçamento e leitura de tela",
+      "mudancas": [
+        "Espaços entre os elementos padronizados em todo o app.",
+        "Botão Revisar da Nova entrada voltou ao tamanho certo.",
+        "Melhorias para quem usa leitor de tela."
+      ]
+    },
+    {
+      "versao": "1.6.0",
+      "data": "2026-11-11",
+      "titulo": "Leitor de rótulo",
+      "mudancas": [
+        "Tire uma foto do rótulo e o app preenche nome, produtor, safra, país, região e tipo para você conferir."
+      ]
+    },
+    {
+      "versao": "1.5.0",
+      "data": "2026-11-11",
+      "titulo": "Nova entrada mais rápida",
+      "mudancas": [
+        "Sugestões enquanto você digita, com o que já existe na adega.",
+        "Aviso quando o vinho e a safra já estão cadastrados.",
+        "Foto na própria entrada, pela câmera ou pela galeria.",
+        "Preço, observações e pontuação numa seção à parte."
+      ]
+    },
+    {
+      "versao": "1.4.0",
+      "data": "2026-11-11",
+      "titulo": "Do mundo do vinho",
+      "mudancas": [
+        "Notícias escolhidas, ligadas aos vinhos que estão na adega."
+      ]
+    },
+    {
+      "versao": "1.3.0",
+      "data": "2026-11-11",
+      "titulo": "No computador",
+      "mudancas": [
+        "Tela larga com menu fixo e a ficha do vinho ao lado da lista."
+      ]
+    },
+    {
+      "versao": "1.2.0",
+      "data": "2026-11-11",
+      "titulo": "Início novo",
+      "mudancas": [
+        "Início com a busca em destaque e um resumo da adega.",
+        "Busca que acha por nome, produtor, região, nicho, safra e notas, mesmo com erro de digitação."
+      ]
+    },
+    {
+      "versao": "1.1.0",
+      "data": "2026-11-08",
+      "titulo": "Primeira versão",
+      "mudancas": [
+        "Adega e bar com fotos, janela de consumo, registro de garrafas abertas, mudanças de lugar e histórico."
+      ]
+    }
+  ]
+}

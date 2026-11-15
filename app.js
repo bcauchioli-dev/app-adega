@@ -3,7 +3,7 @@
 (function () {
 'use strict';
 
-var VERSION = '1.7.0';
+var VERSION = '1.8.0';
 var CFG = window.APP_CONFIG || {};
 var YEAR = new Date().getFullYear();
 var STYLE_ORDER = ['tinto', 'branco', 'rosé', 'espumante', 'doce/fortificado'];
@@ -86,6 +86,12 @@ var MSG = {
   sem_permissao: 'Seu acesso não permite editar este item.',
   produto_inexistente: 'Este item não foi encontrado.',
   campo_nao_permitido: 'Campo não permitido.',
+  nicho_ocupado: 'Não dá para desfazer: o nicho já recebeu outra garrafa. A garrafa continua como consumida.',
+  sugestao_invalida: 'Escreva a sugestão (de 3 a 2.000 letras).',
+  sugestao_limite: 'Muitas sugestões seguidas. Tente de novo mais tarde.',
+  sugestao_inexistente: 'Essa sugestão não existe mais. Atualize os dados.',
+  sugestao_ja_revisada: 'Essa sugestão já foi revisada. Atualize os dados.',
+  pontuacao_invalida: 'Pontuação no formato "96 RP", separadas por ponto e vírgula.',
   noticia_invalida: 'Informe título, fonte e um link que comece com http.',
   noticia_inexistente: 'Essa notícia não existe mais. Atualize os dados.',
   leitura_invalida: 'Não consegui usar essa foto para ler o rótulo.',
@@ -210,7 +216,7 @@ var S = {
         offline: !navigator.onLine, syncedAt: null, syncing: false, bootErr: null, loadingAdega: false },
   modal: null, busy: null, ficha: {}
 };
-var D = { produtos: new Map(), garrafas: new Map(), locais: new Map(), movs: [], alts: [], nomes: new Map(), membros: [], fotos: {}, noticias: [] };
+var D = { produtos: new Map(), garrafas: new Map(), locais: new Map(), movs: [], alts: [], nomes: new Map(), membros: [], fotos: {}, noticias: [], cons: [], sugs: [], ia: [] };
 var X = { byP: new Map(), adega: [], bar: [] };
 
 function adegaAtual() { for (var i = 0; i < S.adegas.length; i++) if (S.adegas[i].id === S.adegaId) return S.adegas[i]; return null; }
@@ -289,11 +295,12 @@ function safra(p) { return p.safra ? String(p.safra) : (p.sem_safra ? 'NV' : '')
 function janela(p) {
   if (p.secao === 'bar' || p.tipo !== 'vinho') return { k: 'na', t: '' };
   var ji = p.janela_inicio, jf = p.janela_fim;
-  if (!ji && !jf) return { k: 'sem', t: 'Sem janela informada' };
-  if (ji && YEAR < ji) return { k: 'guardar', t: 'Guardar até ' + ji };
-  if (jf && YEAR > jf) return { k: 'passou', t: 'Passou da janela (' + jf + ')' };
-  if (jf && YEAR === jf) return { k: 'ultimo', t: 'Último ano da janela' };
-  return { k: 'ponto', t: jf ? 'No ponto · até ' + jf : 'No ponto' };
+  // t: texto curto (busca, painel); f: linha da ficha, só informativa
+  if (!ji && !jf) return { k: 'sem', t: 'Sem janela informada', f: 'Sem janela informada' };
+  if (ji && YEAR < ji) return { k: 'guardar', t: 'Guardar até ' + ji, f: 'Janela de consumo a partir de ' + ji };
+  if (jf && YEAR > jf) return { k: 'passou', t: 'Passou da janela (' + jf + ')', f: 'Janela de consumo indicada até ' + jf };
+  if (jf && YEAR === jf) return { k: 'ultimo', t: 'Último ano da janela', f: 'Dentro da janela de consumo até ' + jf + ', último ano' };
+  return { k: 'ponto', t: jf ? 'No ponto · até ' + jf : 'No ponto', f: jf ? 'Dentro da janela de consumo até ' + jf : 'Dentro da janela de consumo' };
 }
 function paraAbrir(p) { var k = janela(p).k; return k === 'passou' || k === 'ultimo'; }
 function locLabel(gs, full) {
@@ -399,7 +406,14 @@ function freeNichos(n) {
   var used = new Set(); D.garrafas.forEach(function (g) { if (g.status === 'em_estoque' && g.local_id) used.add(g.local_id); });
   var arr = []; D.locais.forEach(function (L) { if (isNicho(L) && !used.has(L.id)) arr.push(nichoNum(L)); });
   arr.sort(function (a, b) { return a - b; });
-  return arr.slice(0, n);
+  var out = [], seen = {};
+  D.movs.forEach(function (m) {   // do mais recente ao mais antigo
+    if (out.length >= 2 || m.tipo !== 'consumo' || !m.de_local_id || seen[m.de_local_id] || m.nota === NOTA_LEGADO) return;
+    seen[m.de_local_id] = 1; var L = D.locais.get(m.de_local_id);
+    if (L && isNicho(L) && !used.has(L.id)) out.push(nichoNum(L));
+  });
+  arr.forEach(function (x) { if (out.length < n && out.indexOf(x) < 0) out.push(x); });
+  return out;
 }
 function areas() { var arr = []; D.locais.forEach(function (L) { if (!isNicho(L) && L.pai_id == null && L.nome !== 'Nichos numerados') arr.push(L); }); return arr.sort(function (a, b) { return cmp(a.nome, b.nome); }); }
 
@@ -457,7 +471,7 @@ if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (P
 var WIDE = window.matchMedia ? window.matchMedia('(min-width: 960px)') : null;
 function isWide() { return !!(WIDE && WIDE.matches); }
 if (WIDE && WIDE.addEventListener) WIDE.addEventListener('change', function () { render(); });
-var DEPTH = { home: 0, vinhos: 0, bar: 0, painel: 0, grupo: 1, busca: 1, historico: 1, noticias: 1, vinho: 2 };
+var DEPTH = { home: 0, vinhos: 0, bar: 0, painel: 0, grupo: 1, busca: 1, historico: 1, noticias: 1, consumidos: 1, sugestoes: 1, ia: 1, tabela: 1, sobre: 1, vinho: 2 };
 function parseHash() {
   var h = location.hash.replace(/^#\/?/, '');
   var parts = h ? h.split('/').map(function (x) { try { return decodeURIComponent(x); } catch (e) { return x; } }) : [];
@@ -468,6 +482,11 @@ function parseHash() {
     case 'busca': return { name: 'busca' };
     case 'historico': return { name: 'historico' };
     case 'noticias': return { name: 'noticias' };
+    case 'consumidos': return { name: 'consumidos' };
+    case 'sugestoes': return { name: 'sugestoes' };
+    case 'ia': return { name: 'ia' };
+    case 'tabela': return { name: 'tabela' };
+    case 'sobre': return { name: 'sobre' };
     case 'g': return { name: 'grupo', modo: parts[1] || 'pais', chave: parts.slice(2).join('/'), secao: parts[1] === 'cat' ? 'bar' : null };
     case 'b': return { name: 'grupo', modo: parts[1] || 'cat', chave: parts.slice(2).join('/'), secao: 'bar' };
     case 'v': return { name: 'vinho', id: parts[1] };
@@ -574,6 +593,7 @@ function renderLayer(opts) {
   }
   clearTimeout(layer.timer);
   var t = layerType(S.modal), html = modalHtml(S.modal);
+  if (S.modal.lidos) Object.keys(S.modal.lidos).forEach(function (k) { html = html.replace('data-f="' + k + '"', 'data-f="' + k + '" data-lido="1"'); });
   if (layer.state !== 'open' || layer.type !== t) {
     var swap = layer.state === 'open';
     el.innerHTML = strip(html);
@@ -650,11 +670,12 @@ function applyAdegaData(o) {
   D.nomes = new Map((o.nomes || []).map(function (n) { return [n.id, n.nome]; }));
   D.membros = o.membros || [];
   D.noticias = ordenaNoticias(o.noticias || []);
+  D.cons = o.cons || []; D.ia = [];
   derive();
 }
 function snapshot() {
   store(cacheKey(S.adegaId), { at: S.ui.syncedAt, produtos: Array.from(D.produtos.values()), garrafas: Array.from(D.garrafas.values()), locais: Array.from(D.locais.values()),
-    movs: D.movs, alts: D.alts, nomes: Array.from(D.nomes, function (e) { return { id: e[0], nome: e[1] }; }), membros: D.membros, noticias: D.noticias });
+    movs: D.movs, alts: D.alts, nomes: Array.from(D.nomes, function (e) { return { id: e[0], nome: e[1] }; }), membros: D.membros, noticias: D.noticias, cons: D.cons });
   store(cacheKey('meta'), { me: S.me, adegas: S.adegas, adegaId: S.adegaId });
 }
 function loadMe() {
@@ -671,8 +692,10 @@ function pickAdega() {
   var withData = S.adegas.filter(function (a) { return a.garrafas > 0; })[0];
   return withData ? withData.id : (S.adegas[0] ? S.adegas[0].id : null);
 }
+var ICOLS = 'id,produto_id,campo,valor_sugerido,fonte_url,fonte_titulo,motivo,status,criado_em';
 function loadAdega(id) {
-  var q = 'adega_id=eq.' + id;
+  var q = 'adega_id=eq.' + id, adm = !!(S.me && S.me.is_admin);
+  var vazio = function (e) { if (e.kind === 'rede' || e.kind === 'sessao') throw e; return []; };
   return Promise.all([
     API.selectAll('produtos', 'select=' + PCOLS + '&' + q + '&order=id.asc'),
     API.selectAll('garrafas', 'select=' + GCOLS + '&' + q + '&order=id.asc'),
@@ -682,10 +705,15 @@ function loadAdega(id) {
     API.rpc('nomes_da_adega', { a: id }),
     API.select('membros', 'select=user_id,papel,nome_exibicao&' + q),
     // enquanto a tabela de notícias não existir no banco, o app segue sem a seção
-    API.select('noticias', 'select=' + NCOLS + '&order=publicada_em.desc&limit=200').catch(function (e) { if (e.kind === 'rede' || e.kind === 'sessao') throw e; return []; })
+    API.select('noticias', 'select=' + NCOLS + '&order=publicada_em.desc&limit=200').catch(function (e) { if (e.kind === 'rede' || e.kind === 'sessao') throw e; return []; }),
+    API.select('movimentos', 'select=' + MCOLS + '&' + q + '&tipo=eq.consumo&order=criado_em.desc&limit=2000'),
+    // só o administrador lê as sugestões dos usuários e as da IA; sem as tabelas (0006 não rodado), segue vazio
+    adm ? API.select('sugestoes_app', 'select=id,adega_id,autor,texto,status,nota_interna,criado_em&order=criado_em.desc&limit=300').catch(vazio) : [],
+    adm ? API.select('sugestoes_ia', 'select=' + ICOLS + '&' + q + '&status=eq.pendente&order=criado_em.desc&limit=500').catch(vazio) : []
   ]).then(function (r) {
     if (id !== S.adegaId) return;
-    applyAdegaData({ produtos: r[0], garrafas: r[1], locais: r[2], movs: r[3], alts: r[4], nomes: r[5], membros: r[6], noticias: r[7] });
+    applyAdegaData({ produtos: r[0], garrafas: r[1], locais: r[2], movs: r[3], alts: r[4], nomes: r[5], membros: r[6], noticias: r[7], cons: r[8] });
+    D.sugs = r[9] || []; D.ia = r[10] || [];
     S.ui.syncedAt = new Date().toISOString(); S.ui.offline = false;
     snapshot();
     signPhotos();
@@ -735,7 +763,7 @@ function toLogin(msg) {
   S.phase = 'login'; S.me = null; S.adegas = []; S.adegaId = null; S.ui.loginErr = msg || null; S.ui.loginBusy = false;
   S.modal = null; closeLayerNow();
   if (history.state && history.state.modal) { try { history.replaceState(null, ''); } catch (e) {} }
-  D = { produtos: new Map(), garrafas: new Map(), locais: new Map(), movs: [], alts: [], nomes: new Map(), membros: [], fotos: {}, noticias: [] };
+  D = { produtos: new Map(), garrafas: new Map(), locais: new Map(), movs: [], alts: [], nomes: new Map(), membros: [], fotos: {}, noticias: [], cons: [], sugs: [], ia: [] };
   S.ficha = {}; S.ui.chips = {}; S.ui.q = ''; S.navDepth = 0;
   derive();
   transition('fade', render);
@@ -780,10 +808,10 @@ function thumb(p) {
 }
 function wineRow(id, ctx) {
   var p = prod(id), gs = stock(id), j = janela(p);
-  var flag = j.k === 'ultimo' ? ' · <span class="flag">último ano</span>' : (j.k === 'passou' ? ' · <span class="flag late">passou da janela</span>' : '');
+  var dot = (j.k === 'ultimo' || j.k === 'passou') ? '<i class="jdot" aria-hidden="true"></i><span class="sr">, ' + (j.k === 'ultimo' ? 'último ano da janela de consumo' : 'passou da janela de consumo') + '</span>' : '';
   var lab = locLabel(gs, false);
   return '<a class="row" data-k="' + id + '" href="#/v/' + id + '">' + thumb(p) +
-    '<span class="info"><span class="nm">' + esc(p.nome) + '</span><span class="meta">' + esc(metaLine(p, ctx)) + flag + '</span>' + (lab ? '<span class="loc">' + esc(lab) + '</span>' : '') + '</span>' +
+    '<span class="info"><span class="nm">' + esc(p.nome) + dot + '</span><span class="meta">' + esc(metaLine(p, ctx)) + '</span>' + (lab ? '<span class="loc">' + esc(lab) + '</span>' : '') + '</span>' +
     '<span class="qty" aria-label="' + plural(gs.length, 'garrafa', 'garrafas') + '">' + gs.length + '</span></a>';
 }
 function topBar(left, title, sub, right, serif) {
@@ -833,7 +861,7 @@ function saudacao() { var h = new Date().getHours(); return h < 5 ? 'Boa noite' 
 function viewHome() {
   var total = countB(X.adega) + countB(X.bar);
   var a = adegaAtual();
-  var head = '<header class="top" id="top"><div class="top-in wrap">' + btnMenu() +
+  var head = '<header class="top htop" id="top"><div class="top-in wrap">' + btnMenu() +
     '<div class="ttl ctr"><span class="sub">' + esc(a ? a.nome : '') + '</span></div><span class="ib-sp" aria-hidden="true"></span></div>' + offlineBar() + '</header>';
   if (S.ui.loadingAdega) return head + '<main class="wrap content">' + skeletonRows(7) + '</main>';
   if (!X.adega.length && !X.bar.length) {
@@ -881,7 +909,7 @@ function viewVinhos() {
       '<span class="gt"><span class="gn">' + esc(g.label) + '</span></span>' +
       '<span class="gc">' + nfmt(g.n) + '<span class="sr"> ' + (g.n === 1 ? 'garrafa' : 'garrafas') + '</span></span><span class="chev">' + I.chev + '</span></a>';
   }).join('') + '</div>';
-  return head + '<main class="wrap content">' + noticeHtml() + (X.adega.length ? tiles : '') +
+  return head + '<main class="wrap content">' + (X.adega.length ? tiles : '') +
     '<p class="sect-label">Vinhos · ' + plural(countB(X.adega), 'garrafa', 'garrafas') + '</p>' +
     seg('ver', [['pais', 'País'], ['avaliacao', 'Avaliação'], ['tipo', 'Tipo'], ['local', 'Local']], mode) + (X.adega.length ? list : '<p class="hint" style="padding:var(--space-4) var(--space-1)">Nenhum vinho em estoque.</p>') + '</main>';
 }
@@ -893,7 +921,7 @@ function viewBar() {
   var groups = groupsFor(mode, X.bar);
   return head + '<main class="wrap content"><p class="sect-label" style="margin-top:var(--space-4)">Ver por</p>' + seg('barver', [['cat', 'Categoria'], ['local', 'Local']], mode) +
     '<div class="glist">' + groups.map(function (g) {
-      return '<a class="grow" data-k="' + esc(mode + ':' + g.key) + '" href="' + hrefGroup(mode, g.key, 'bar') + '" aria-label="' + esc(g.label + ', ' + plural(g.n, 'garrafa', 'garrafas')) + '"><span class="gt"><span class="gn">' + esc(g.label) + '</span></span><span class="gc">' + nfmt(g.n) + '</span><span class="chev">' + I.chev + '</span></a>';
+      return '<a class="grow" data-k="' + esc(mode + ':' + g.key) + '" href="' + hrefGroup(mode, g.key, 'bar') + '"><span class="gt"><span class="gn">' + esc(g.label) + '</span></span><span class="gc">' + nfmt(g.n) + '<span class="sr"> ' + (g.n === 1 ? 'garrafa' : 'garrafas') + '</span></span><span class="chev">' + I.chev + '</span></a>';
     }).join('') + '</div></main>';
 }
 function viewGroup(r) {
@@ -938,7 +966,7 @@ function feedIcon(t) {
   if (t === 'mudanca_local') return '<span class="ico mv">' + I.move + '</span>';
   return '<span class="ico">' + I.edit + '</span>';
 }
-var CAMPO_NOME = { nome: 'nome', produtor: 'produtor', pais: 'país', regiao: 'região', estilo: 'tipo', categoria: 'categoria', safra: 'safra', sem_safra: 'safra', volume_ml: 'volume', janela_inicio: 'janela', janela_fim: 'janela', avaliacao: 'avaliação', notas: 'notas', foto_path: 'foto', marcador: 'marcador' };
+var CAMPO_NOME = { pontuacoes: 'pontuação', nome: 'nome', produtor: 'produtor', pais: 'país', regiao: 'região', estilo: 'tipo', categoria: 'categoria', safra: 'safra', sem_safra: 'safra', volume_ml: 'volume', janela_inicio: 'janela', janela_fim: 'janela', avaliacao: 'avaliação', notas: 'notas', foto_path: 'foto', marcador: 'marcador' };
 function feedItems(movs, alts, opts) {
   opts = opts || {};
   var items = [];
@@ -1021,11 +1049,10 @@ function viewFicha(id) {
       var lo = Math.min(p.janela_inicio, YEAR) - 1, hi = Math.max(p.janela_fim, YEAR) + 1, span = hi - lo;
       var f0 = (p.janela_inicio - lo) / span * 100, f1 = (p.janela_fim - lo) / span * 100, nw = (YEAR - lo) / span * 100;
       bar = '<div class="win" role="img" aria-label="' + esc('Janela de ' + p.janela_inicio + ' a ' + p.janela_fim + '; hoje é ' + YEAR) + '"><div class="wl">' + winLabel(nw, 'hoje', 'now-l') + '</div>' +
-        '<div class="track"><span class="fill" style="left:' + f0.toFixed(1) + '%;width:' + (f1 - f0).toFixed(1) + '%;background:' + (j.k === 'passou' ? 'var(--wine)' : j.k === 'ultimo' ? 'var(--gold)' : j.k === 'guardar' ? 'var(--blue)' : 'var(--ok)') + '"></span><span class="now" style="left:' + nw.toFixed(1) + '%"></span></div>' +
+        '<div class="track"><span class="fill" style="left:' + f0.toFixed(1) + '%;width:' + (f1 - f0).toFixed(1) + '%;background:' + (j.k === 'passou' || j.k === 'ultimo' ? 'var(--gold)' : j.k === 'guardar' ? 'var(--blue)' : 'var(--ok)') + '"></span><span class="now" style="left:' + nw.toFixed(1) + '%"></span></div>' +
         '<div class="wl">' + (f1 - f0 < 16 ? winLabel((f0 + f1) / 2, p.janela_inicio + '–' + p.janela_fim) : winLabel(f0, p.janela_inicio) + winLabel(f1, p.janela_fim)) + '</div></div>';
     }
-    var col = j.k === 'passou' ? 'var(--wine-fg)' : j.k === 'ultimo' ? 'var(--gold-fg)' : 'var(--muted)';
-    win = '<section class="sec"><div class="sec-h"><h2>Janela de consumo</h2><span style="font-size:13.5px;color:' + col + '">' + esc(j.t) + '</span></div>' + bar +
+    win = '<section class="sec"><div class="sec-h"><h2>Janela de consumo</h2><span class="jinfo">' + esc(j.f) + '</span></div>' + bar +
       (!p.janela_inicio && !p.janela_fim ? '<p>' + (fx && fx.extra && fx.extra.guarda_original ? 'Na planilha: “' + esc(fx.extra.guarda_original) + '”. ' : '') + 'Sem janela cadastrada.' + (write ? ' Dá para informar em Editar.' : '') + '</p>' : (!p.janela_inicio ? '<p>Início da janela não informado.</p>' : '')) + '</section>';
   }
   var sc = (p.pontuacoes || []).map(function (x) { return esc(x.nota + ' · ' + (x.fonte || x.sigla || '')); }).join('<br>');
@@ -1047,7 +1074,9 @@ function viewFicha(id) {
   return '<header class="top" id="top"><div class="top-in wrap">' + btnBack(p.secao === 'bar' ? '#/bar' : '#/vinhos') + '<div class="ttl"><span class="h1" aria-hidden="true">' + esc(p.nome) + (p.safra ? ' ' + p.safra : '') + '</span></div>' + right + '</div>' + offlineBar() + '</header>' +
     '<main class="wrap content' + (actions ? ' has-actions' : '') + '"><section class="hero">' + photo + '<div class="info">' + rating + '<h1>' + esc(p.nome) + '</h1>' + (line2 ? '<p class="m">' + esc(line2) + '</p>' : '') + '<p>' + esc(line3) + '</p></div></section>' +
     '<section class="sec"><div class="sec-h"><h2>' + plural(gs.length, 'garrafa', 'garrafas') + (gs.length ? ' · ' + esc(locLabel(gs, true)) : '') + '</h2>' + (write ? '<button class="link" type="button" data-a="adicionar" data-x="' + id + '">+ Adicionar</button>' : '') + '</div>' + slots + '</section>' +
-    win + '<section class="sec">' + kv + '</section>' +
+    win + '<section class="sec">' + kv + (S.me && S.me.is_admin && p.secao !== 'bar' ? (D.ia.some(function (x) { return x.produto_id === id; })
+      ? '<a class="link" href="#/ia" style="align-self:flex-start">' + plural(D.ia.filter(function (x) { return x.produto_id === id; }).length, 'sugestão da IA', 'sugestões da IA') + ' para aprovar</a>'
+      : '<button class="link" type="button" data-a="pediria" data-x="' + id + '" style="align-self:flex-start">Pedir sugestões da IA</button>') : '') + '</section>' +
     '<section class="sec"><h2>Histórico</h2>' + hist + '</section>' +
     (!canWrite() ? '<p class="hint" style="padding:var(--space-2) 0 var(--space-5)">Seu acesso é somente de consulta.</p>' : '') + '</main>';
 }
@@ -1240,6 +1269,189 @@ function ligaTxt(s) {
   if (!ts.length) return 'Sem termos, a notícia aparece em todas as adegas.';
   return 'Nesta adega: ' + ts.map(function (t) { var l = ligacao([t]); return t + ' — ' + (l ? plural(l.ids.length, 'rótulo', 'rótulos') : 'nenhum rótulo'); }).join(' · ');
 }
+function consumidos() {
+  if (X.cons) return X.cons;
+  var seen = {}, out = [];
+  D.cons.slice().sort(function (a, b) { return a.criado_em < b.criado_em ? 1 : -1; }).forEach(function (m) {
+    var g = D.garrafas.get(m.garrafa_id); if (!g || g.status !== 'consumida' || seen[g.id] || !prod(g.produto_id)) return;
+    seen[g.id] = 1; out.push({ m: m, pid: g.produto_id, legado: m.nota === NOTA_LEGADO, at: m.ocorrido_em || m.criado_em });
+  });
+  out.sort(function (x, y) { if (x.legado !== y.legado) return x.legado ? 1 : -1; return x.at < y.at ? 1 : x.at > y.at ? -1 : 0; });
+  X.cons = out;
+  return out;
+}
+function viewConsumidos() {
+  var items = consumidos();
+  var head = topBar(btnBack('#/'), 'Consumidos', plural(items.length, 'garrafa', 'garrafas') + ' · ' + ((adegaAtual() || {}).nome || ''), '', true);
+  if (!items.length) return head + '<main class="wrap content">' + emptyState('Nenhuma garrafa consumida ainda', 'Quando uma garrafa for aberta, ela aparece aqui com a data, quem registrou e o nicho de onde saiu.') + '</main>';
+  var html = '', cur = null;
+  items.forEach(function (it) {
+    var p = prod(it.pid), m = it.m, deL = m.de_local_id ? D.locais.get(m.de_local_id) : null;
+    var grp = it.legado ? 'Planilha antiga, sem data' : dt(it.at).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+    if (grp !== cur) { html += '<div class="day" data-k="d:' + esc(grp) + '">' + esc(grp) + '</div>'; cur = grp; }
+    var meta = [];
+    if (deL) meta.push('saiu ' + deLoc(deL));
+    if (!it.legado) meta.push('por ' + nomeUsuario(m.usuario_id));
+    if (m.ocasiao) meta.push(m.ocasiao);
+    if (m.com_quem) meta.push('com ' + m.com_quem);
+    html += '<a class="fi" data-k="c:' + m.id + '" href="#/v/' + it.pid + '">' + feedIcon('consumo') + '<span class="t"><b>' + esc(p.nome) + '</b>' + (safra(p) ? ' ' + esc(safra(p)) : '') + '</span><span class="d">' + (it.legado ? '' : esc(fmtDate(it.at))) + '</span><span class="m">' + esc(meta.join(' · ') || (it.legado ? 'registrado na planilha antiga' : '')) + '</span></a>';
+  });
+  return head + '<main class="wrap content"><div class="feed">' + html + '</div></main>';
+}
+/* ---------- sugestões dos usuários (só o administrador lê) ---------- */
+var SG_NOME = { nova: 'Nova', em_analise: 'Em análise', feita: 'Feita', descartada: 'Descartada' };
+function viewSugestoes() {
+  var head = topBar(btnBack('#/'), 'Sugestões recebidas', 'De todos os usuários do app', '', true);
+  if (!(S.me && S.me.is_admin)) return head + '<main class="wrap content">' + emptyState('Área do administrador', 'Para mandar uma sugestão, use o menu › Enviar sugestão.') + '</main>';
+  var f = S.ui.sgf || 'nova', n = function (k) { return D.sugs.filter(function (x) { return x.status === k; }).length; };
+  var chips = [['nova', 'Novas · ' + n('nova')], ['em_analise', 'Em análise · ' + n('em_analise')], ['feita', 'Feitas · ' + n('feita')], ['descartada', 'Descartadas · ' + n('descartada')], ['todas', 'Todas · ' + D.sugs.length]];
+  var list = D.sugs.filter(function (x) { return f === 'todas' || x.status === f; });
+  var nomeAdega = function (id) { var a = S.adegas.filter(function (x) { return x.id === id; })[0]; return a ? a.nome : ''; };
+  return head + '<main class="wrap content"><div class="chips" role="group" aria-label="Situação">' + chips.map(function (c) { return '<button class="chip" type="button" data-a="sgf" data-x="' + c[0] + '" aria-pressed="' + (f === c[0]) + '">' + esc(c[1]) + '</button>'; }).join('') + '</div>' +
+    (list.length ? '<div class="nlist">' + list.map(function (x) {
+      return '<article class="news" data-k="sg:' + esc(x.id) + '"><span class="src">' + esc([x.autor || 'Sem nome', nomeAdega(x.adega_id), fmtDate(x.criado_em)].filter(Boolean).join(' · ')) + '</span>' +
+        '<p class="sgt">' + esc(x.texto) + '</p>' + (x.nota_interna ? '<p class="nmot"><b>Nota interna:</b> ' + esc(x.nota_interna) + '</p>' : '') +
+        '<div class="nadm"><span class="ntag' + (x.status === 'nova' ? ' on' : '') + '">' + esc(SG_NOME[x.status] || x.status) + '</span><span class="hint"></span><button class="link" type="button" data-a="sugestao" data-x="' + esc(x.id) + '">Atualizar</button></div></article>';
+    }).join('') + '</div>' : emptyState(D.sugs.length ? 'Nada nesta situação' : 'Nenhuma sugestão ainda', 'As mensagens enviadas pelo menu › Enviar sugestão chegam aqui.')) + '</main>';
+}
+
+/* ---------- sugestões da IA para os cadastros (só o administrador aprova) ---------- */
+function iaTexto(x, p) {
+  var v = x.valor_sugerido || {};
+  if (x.campo === 'pontuacao') return ['Pontuação', esc(v.nota + ' · ' + v.fonte)];
+  if (x.campo === 'janela') return ['Janela de consumo', esc((v.inicio || '?') + '–' + (v.fim || '?')) + ' <span class="hint">hoje: ' + (p.janela_inicio || p.janela_fim ? esc((p.janela_inicio || '?') + '–' + (p.janela_fim || '?')) : 'sem janela') + '</span>'];
+  if (x.campo === 'nome' || x.campo === 'produtor') return [x.campo === 'nome' ? 'Nome' : 'Produtor', esc(v.texto || '') + ' <span class="hint">hoje: ' + esc(p[x.campo] || 'vazio') + '</span>'];
+  return [x.campo, esc(JSON.stringify(v))];
+}
+function viewIA() {
+  var head = topBar(btnBack('#/'), 'Sugestões da IA', (adegaAtual() || {}).nome, '', true);
+  if (!(S.me && S.me.is_admin)) return head + '<main class="wrap content">' + emptyState('Área do administrador', 'As sugestões da IA são revisadas pela administração antes de entrar no cadastro.') + '</main>';
+  var byP = new Map(); D.ia.forEach(function (x) { if (!prod(x.produto_id)) return; var a = byP.get(x.produto_id); if (!a) { a = []; byP.set(x.produto_id, a); } a.push(x); });
+  var cards = ''; byP.forEach(function (arr, pid) {
+    var p = prod(pid);
+    cards += '<article class="news" data-k="ia:' + pid + '"><span class="src">' + esc([p.produtor, p.regiao, p.pais].filter(Boolean).join(' · ')) + '</span><h3><a href="#/v/' + pid + '">' + esc(p.nome) + (safra(p) ? ' ' + esc(safra(p)) : '') + '</a></h3>' +
+      arr.map(function (x) {
+        var t = iaTexto(x, p), busy = S.busy === 'ia:' + x.id;
+        return '<div class="iarow" data-k="i:' + esc(x.id) + '"><div class="iat"><b>' + t[0] + ':</b> ' + t[1] + '</div>' +
+          (x.motivo ? '<p>' + esc(x.motivo) + '</p>' : '') +
+          '<p>Fonte: ' + (urlOk(x.fonte_url) ? '<a class="iaf" href="' + esc(x.fonte_url) + '" target="_blank" rel="noopener noreferrer">' + esc(x.fonte_titulo || x.fonte_url) + I.ext + '</a>' : 'sem link') + '</p>' +
+          '<div class="nact"><button class="btn small primary" type="button" data-a="iaok" data-x="' + esc(x.id) + '"' + (S.busy ? ' disabled' : '') + '>' + (busy ? '<span class="spin" aria-hidden="true"></span>' : I.check) + 'Aprovar</button><button class="btn small danger" type="button" data-a="iano" data-x="' + esc(x.id) + '"' + (S.busy ? ' disabled' : '') + '>Descartar</button></div></div>';
+      }).join('') + '</article>';
+  });
+  return head + '<main class="wrap content"><p class="note" style="margin-top:var(--space-4)">A cada vinho cadastrado ou editado, a IA procura pontuação, janela de consumo e erros de grafia, sempre com a fonte. Abra a fonte, confira e aprove; nada entra no cadastro sem o seu ok. Depois de aprovada, a janela continua editável na ficha.</p>' +
+    (cards ? '<div class="nlist" style="margin-top:var(--space-4)">' + cards + '</div>' : emptyState('Nada para aprovar', 'As sugestões aparecem aqui depois que um vinho é cadastrado ou editado. Na ficha de um vinho também dá para pedir uma busca.')) + '</main>';
+}
+function pedirIA(pid, manual) {
+  if ((S.ui.semIA && !manual) || !navigator.onLine) return;
+  if (manual) toast('Pedido enviado à IA. Pode levar meio minuto.');
+  API.fn('completar-cadastro', { produto_id: pid, forcar: !!manual }).then(function (r) {
+    if (!(S.me && S.me.is_admin)) return;
+    if (r && r.criadas) {
+      return API.select('sugestoes_ia', 'select=' + ICOLS + '&adega_id=eq.' + S.adegaId + '&status=eq.pendente&order=criado_em.desc&limit=500').then(function (rows) {
+        D.ia = rows || []; render(); if (manual) toast(plural(r.criadas, 'sugestão nova', 'sugestões novas') + ' da IA para aprovar.');
+      });
+    }
+    if (manual) toast(r && r.motivo === 'ja_tem' ? 'Este vinho já recebeu sugestões da IA.' : 'A IA não achou nada com fonte verificável.');
+  }).catch(function (e) {
+    if (e && e.kind === 'sessao') return;
+    if (e && (e.status === 404 || e.kind === 'rede')) S.ui.semIA = true;
+    if (manual) toast(e && e.status === 404 ? 'A função da IA ainda não está instalada no servidor.' : 'A IA não respondeu agora. Tente de novo mais tarde.', { err: true });
+  });
+}
+function iaRevisar(id, aprovar) {
+  var p = run('ia:' + id, function () {
+    return API.rpc(aprovar ? 'aprovar_sugestao_ia' : 'descartar_sugestao_ia', { p_id: id }).then(function (np) {
+      if (aprovar && np && np.id) { var old = prod(np.id) || {}, mg = {}; for (var k in old) mg[k] = old[k]; PCOLS.split(',').forEach(function (c) { if (c in np) mg[c] = np[c]; }); D.produtos.set(np.id, mg); delete S.ficha[np.id]; }
+      D.ia = D.ia.filter(function (x) { return x.id !== id; }); derive(); snapshot();
+      toast(aprovar ? 'Aprovada e gravada no cadastro.' : 'Sugestão descartada.');
+    });
+  });
+  render(); if (p) p.then(render);
+}
+
+/* ---------- edição em massa (administrador, no computador) ---------- */
+var TB_FILTROS = [['todos', 'Todos'], ['janela', 'Sem janela'], ['pontuacao', 'Sem pontuação'], ['avaliacao', 'Sem avaliação'], ['produtor', 'Sem produtor'], ['regiao', 'Sem região'], ['pais', 'Sem país']];
+function tbFalta(p, f) {
+  if (f === 'janela') return !p.janela_inicio && !p.janela_fim;
+  if (f === 'pontuacao') return !(p.pontuacoes && p.pontuacoes.length);
+  if (f === 'todos') return true;
+  return !String(p[f] || '').trim();
+}
+function tbPont(p) { return (p.pontuacoes || []).map(function (x) { return x.nota + ' ' + (x.fonte || x.sigla || ''); }).join('; '); }
+function viewTabela() {
+  var head = topBar(btnBack('#/'), 'Edição em massa', (adegaAtual() || {}).nome, '', true);
+  if (!(S.me && S.me.is_admin)) return head + '<main class="wrap content">' + emptyState('Área do administrador', 'A edição em massa é feita pela administração.') + '</main>';
+  if (!isWide()) return head + '<main class="wrap content">' + emptyState('Abra no computador', 'A edição em massa usa uma tabela larga, com uma linha por vinho. Abra o app numa tela de computador para usar.') + '</main>';
+  var tb = S.ui.tb || (S.ui.tb = { f: 'todos', q: '', lim: 150, fora: false });
+  var base = []; D.produtos.forEach(function (p) { if (p.secao !== 'bar' && (tb.fora || stock(p.id).length)) base.push(p); });
+  var q = normT(tb.q);
+  var rows = base.filter(function (p) { return tbFalta(p, tb.f) && (!q || (' ' + normT([p.nome, p.produtor, p.regiao, p.pais, p.safra].join(' '))).indexOf(' ' + q) >= 0); });
+  rows.sort(function (a, b) { return cmp(a.nome, b.nome) || (a.safra || 0) - (b.safra || 0); });
+  var inp = function (p, c, v, extra) { return '<td class="c-' + c + '"><input data-tb="' + c + '" data-id="' + p.id + '" value="' + esc(v == null ? '' : v) + '" aria-label="' + c + '" autocomplete="off" ' + (extra || '') + '></td>'; };
+  var sel = function (p, c, opts, v) { return '<td class="c-' + c + '"><select data-tb="' + c + '" data-id="' + p.id + '" aria-label="' + c + '">' + opts.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (o[0] === (v || '') ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + '</select></td>'; };
+  var tipos = [['', '—']].concat(STYLE_ORDER.map(function (x) { return [x, STYLE_ONE[x]]; })), avs = [['', '—']].concat(escala().map(function (e) { return [e, e]; }));
+  var body = rows.slice(0, tb.lim).map(function (p) {
+    return '<tr data-k="tb:' + p.id + '">' + inp(p, 'nome', p.nome) + inp(p, 'produtor', p.produtor) + inp(p, 'safra', p.safra, 'inputmode="numeric" maxlength="4" placeholder="NV"') + inp(p, 'pais', p.pais) + inp(p, 'regiao', p.regiao) +
+      sel(p, 'estilo', tipos, p.estilo) + sel(p, 'avaliacao', avs, p.avaliacao) + inp(p, 'janela_inicio', p.janela_inicio, 'inputmode="numeric" maxlength="4"') + inp(p, 'janela_fim', p.janela_fim, 'inputmode="numeric" maxlength="4"') +
+      inp(p, 'pontuacoes', tbPont(p)) + inp(p, 'notas', p.notas) +
+      '<td class="c-n">' + stock(p.id).length + '</td><td class="c-l"><a href="#/v/' + p.id + '" aria-label="Abrir a ficha de ' + esc(p.nome) + '">' + I.chev + '</a></td></tr>';
+  }).join('');
+  return head + '<main class="wrap content tbl"><div class="tbbar"><label class="search tbq">' + I.search + '<span class="sr">Filtrar a tabela</span><input id="tq" type="search" autocomplete="off" placeholder="Filtrar por nome, produtor, região…" value="' + esc(tb.q) + '"></label>' +
+    '<div class="chips" role="group" aria-label="Mostrar">' + TB_FILTROS.map(function (c) { return '<button class="chip" type="button" data-a="tbf" data-x="' + c[0] + '" aria-pressed="' + (tb.f === c[0]) + '">' + esc(c[1]) + ' · ' + base.filter(function (p) { return tbFalta(p, c[0]); }).length + '</button>'; }).join('') +
+    '<button class="chip" type="button" data-a="tbfora" aria-pressed="' + !!tb.fora + '">Incluir sem estoque</button></div></div>' +
+    '<p class="note">' + plural(rows.length, 'vinho', 'vinhos') + '. Cada campo é gravado ao sair dele (Enter passa para a linha de baixo) e a alteração entra no histórico do vinho. Pontuações no formato “96 RP; 94 WS”.</p>' +
+    (rows.length ? '<div class="tbwrap"><table class="tb"><thead><tr><th>Nome</th><th>Produtor</th><th>Safra</th><th>País</th><th>Região</th><th>Tipo</th><th>Aval.</th><th>Beber de</th><th>até</th><th>Pontuações</th><th>Notas</th><th title="Garrafas em estoque">Grf.</th><th></th></tr></thead><tbody>' + body + '</tbody></table></div>' +
+      (rows.length > tb.lim ? '<button class="btn small" type="button" data-a="tbmais" style="margin-top:var(--space-4)">Mostrar mais ' + Math.min(150, rows.length - tb.lim) + '</button>' : '')
+      : emptyState('Nada para mostrar', 'Nenhum vinho bate com esse filtro.')) + '</main>';
+}
+function tbSave(el) {
+  var c = el.getAttribute('data-tb'), id = el.getAttribute('data-id'), p = prod(id); if (!p) return;
+  var v = String(el.value == null ? '' : el.value).trim(), call, bad = null;
+  var cur = c === 'pontuacoes' ? tbPont(p) : (p[c] == null ? '' : String(p[c]));
+  if (v === cur) { el.removeAttribute('data-st'); return; }
+  if (c === 'pontuacoes') {
+    var arr = v ? v.split(/[;\n]/).map(function (t) { var m = /^\s*(\d{1,3}(?:[.,]\d)?)\s+(.+?)\s*$/.exec(t); return m ? { nota: parseFloat(m[1].replace(',', '.')), fonte: m[2] } : null; }) : [];
+    if (arr.some(function (x) { return !x || x.nota > 100; })) bad = MSG.pontuacao_invalida;
+    else call = API.rpc('definir_pontuacoes', { p_produto: id, p_pontuacoes: arr });
+  } else {
+    if (c === 'nome' && !v) bad = 'O nome não pode ficar vazio.';
+    if ((c === 'safra' || c === 'janela_inicio' || c === 'janela_fim') && !yearOk(v)) bad = 'Use o ano com quatro dígitos.';
+    var ji = c === 'janela_inicio' ? v : p.janela_inicio, jf = c === 'janela_fim' ? v : p.janela_fim;
+    if (!bad && (c === 'janela_inicio' || c === 'janela_fim') && ji && jf && +jf < +ji) bad = 'O fim da janela precisa ser igual ou depois do início.';
+    var patch = {}; patch[c] = v; if (c === 'safra') patch.sem_safra = !v;
+    if (!bad) call = API.rpc('editar_produto', { p_produto: id, p_campos: patch });
+  }
+  if (bad || !guardOnline()) { el.setAttribute('data-st', 'erro'); if (bad) toast(bad, { err: true }); return; }
+  el.setAttribute('data-st', 'salvando');
+  call.then(function (np) {
+    var mg = {}; for (var k in p) mg[k] = p[k]; PCOLS.split(',').forEach(function (x) { if (x in np) mg[x] = np[x]; });
+    D.produtos.set(id, mg); delete S.ficha[id]; X.hay = null; X.nd = null; snapshot();
+    el.setAttribute('data-st', 'ok'); setTimeout(function () { if (el.getAttribute('data-st') === 'ok') el.removeAttribute('data-st'); }, 1800);
+  }).catch(function (e) {
+    if (e && e.kind === 'sessao') { toLogin(MSG.sessao); return; }
+    el.setAttribute('data-st', 'erro'); toast((e && e.message) || 'Não foi possível gravar.', { err: true });
+  });
+}
+
+/* ---------- sobre o app ---------- */
+function loadVersoes() {
+  if (S.versoes || S.versoesBusy) return; S.versoesBusy = true;
+  fetch('./versoes.json', { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error('http'); return r.json(); })
+    .then(function (j) { S.versoes = j; }, function () { S.versoes = { erro: true }; })
+    .then(function () { S.versoesBusy = false; if (S.route.name === 'sobre') render(); });
+}
+function viewSobre() {
+  var head = topBar(btnBack('#/'), 'Sobre o app', 'App Adega · versão ' + VERSION, '', true), v = S.versoes;
+  if (!v) { loadVersoes(); return head + '<main class="wrap content">' + skeletonRows(4) + '</main>'; }
+  if (v.erro) return head + '<main class="wrap content">' + emptyState('Sem conexão', 'Não deu para carregar o histórico das versões agora. A versão instalada é a ' + VERSION + '.') + '</main>';
+  var li = function (a) { return '<ul class="vlist">' + (a || []).map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>'; };
+  var vs = v.versoes || [], atual = vs.filter(function (x) { return x.versao === VERSION; })[0], outras = vs.filter(function (x) { return x !== atual; });
+  return head + '<main class="wrap content sobre">' +
+    (atual ? '<section class="panel"><h2>Nesta versão<small>' + esc(atual.versao) + (atual.data ? ' · ' + esc(fmtDia(atual.data)) : '') + '</small></h2>' + (atual.titulo ? '<p class="vt">' + esc(atual.titulo) + '</p>' : '') + li(atual.mudancas) + '</section>' : '') +
+    ((v.proximas || []).length ? '<section class="panel"><h2>Próximas versões</h2>' + li(v.proximas) + '</section>' : '') +
+    (outras.length ? '<section class="panel"><h2>Versões anteriores</h2>' + outras.map(function (x) { return '<div class="vold"><p class="vt">' + esc(x.versao) + (x.data ? ' · ' + esc(fmtDia(x.data)) : '') + (x.titulo ? ' · ' + esc(x.titulo) : '') + '</p>' + li(x.mudancas) + '</div>'; }).join('') + '</section>' : '') +
+    '<p class="hint" style="padding:var(--space-4) 2px 0">Tem uma ideia ou algo atrapalhou? Use o menu › Enviar sugestão.</p></main>';
+}
 function viewHistorico() {
   var head = topBar(btnBack('#/painel'), 'Histórico', (adegaAtual() || {}).nome, '', true);
   var items = feedItems(D.movs, D.alts);
@@ -1304,6 +1516,7 @@ function dupProduto(d) {
   D.produtos.forEach(function (p) { if (!r && (p.secao === 'bar') === !!d.bar && normT(p.nome) === n && (p.safra ? String(p.safra) : '') === sf && (!String(d.produtor || '').trim() || normT(p.produtor) === normT(d.produtor))) r = p; });
   return r;
 }
+function disc(m, t) { return '<button class="disc" type="button" data-a="more" aria-expanded="' + !!m.more + '"><span>' + esc(t) + '</span>' + I.chev + '</button>'; }
 function sheetHd(t, serif) { return '<div class="hd"><h2' + (serif ? ' class="serif"' : '') + '>' + esc(t) + '</h2><button class="ib ghost" type="button" data-a="close" aria-label="Fechar">' + I.close + '</button></div>'; }
 function summary(p, meta) { return '<div class="summary">' + thumb(p) + '<span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:var(--space-1)"><span class="nm">' + esc(p.nome) + '</span><span class="meta">' + esc(meta) + '</span></span></div>'; }
 function busyBtn(action, label, busyLabel, cls) { var b = S.busy === action; return '<button class="btn primary block ' + (cls || '') + '" type="button" data-a="' + action + '"' + (b ? ' disabled' : '') + '>' + (b ? '<span class="spin" aria-hidden="true"></span>' + esc(busyLabel) : esc(label)) + '</button>'; }
@@ -1362,10 +1575,10 @@ function modalHtml(m) {
       (vinho ? '<div class="fld"><span>Avaliação</span>' + pickRow('pickrate', escala().map(function (e) { return [e, e]; }), d.avaliacao) + '</div>' +
         '<div class="grid2">' + field('Beber a partir de', 'janela_inicio', d.janela_inicio, 'inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="Ano"') + field('Beber até', 'janela_fim', d.janela_fim, 'inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="Ano"') + '</div>' : '') +
       '<label class="fld">Notas<textarea data-f="notas" rows="3" maxlength="600" placeholder="Observações da adega">' + esc(d.notas || '') + '</textarea></label>' +
-      (m.more ? field('Nome', 'nome', d.nome, 'maxlength="140"') + '<div class="grid-ns">' + field('Produtor', 'produtor', d.produtor, 'maxlength="100"') + field('Safra', 'safra', d.safra, 'inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="NV"') + '</div>' +
+      disc(m, 'Nome, produtor, safra e origem') + (m.more ? field('Nome', 'nome', d.nome, 'maxlength="140"') + '<div class="grid-ns">' + field('Produtor', 'produtor', d.produtor, 'maxlength="100"') + field('Safra', 'safra', d.safra, 'inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="NV"') + '</div>' +
         '<div class="grid2">' + field('País', 'pais', d.pais, 'maxlength="50"') + field('Região', 'regiao', d.regiao, 'maxlength="80"') + '</div>' +
         (vinho ? '<div class="fld"><span>Tipo</span>' + pickRow('pickstyle', STYLE_ORDER.map(function (s) { return [s, STYLE_ONE[s]]; }), d.estilo) + '</div>' : field('Categoria', 'categoria', d.categoria, 'maxlength="50"'))
-        : '<button class="link" type="button" data-a="more" style="align-self:flex-start">Editar nome, produtor, safra e origem</button>') +
+        : '') +
       errLine(m) + '<button class="btn primary block" type="button" data-a="revisar">Revisar</button>' + SHEET_END;
   }
   if (m.kind === 'entrada' || m.kind === 'adicionar') {
@@ -1408,10 +1621,10 @@ function modalHtml(m) {
       (livres.length ? '<div class="fld"><span>Nichos livres</span>' + pickRow('picklivre', livres.map(function (n) { return [String(n), pad(n)]; }), null) + '</div>' : '') +
       (ar2.length ? '<div class="fld"><span>Ou numa área</span><div class="pick">' + arV.map(function (L) { return '<button type="button" data-a="pickarea" data-x="' + esc(L.id) + '" aria-pressed="' + (d.area === L.id) + '">' + esc(L.nome) + '</button>'; }).join('') +
         (ar2.length > arV.length ? '<button type="button" class="more" data-a="maisareas">Mais ' + (ar2.length - arV.length) + ' locais</button>' : '') + '</div></div>' : '') +
-      (add ? precoHtml : (m.more ? precoHtml +
+      (add ? precoHtml : disc(m, 'Preço, observações e pontuação') + (m.more ? precoHtml +
         '<label class="fld">Observações<textarea data-f="notas" rows="3" maxlength="600" placeholder="Quem presenteou, ocasião, o que achar útil">' + esc(d.notas || '') + '</textarea></label>' +
         '<div class="grid2">' + field('Pontuação', 'pt_nota', d.pt_nota, 'inputmode="decimal" maxlength="5" placeholder="Ex.: 96"') + field('De quem', 'pt_fonte', d.pt_fonte, 'maxlength="30" placeholder="Ex.: RP, WS, JS" autocapitalize="characters"') + '</div>'
-        : '<button class="link" type="button" data-a="more" style="align-self:flex-start">Preço, observações e pontuação</button>')) +
+        : '')) +
       errLine(m) + '<button class="btn primary block" type="button" data-a="revisar">Revisar</button>' + SHEET_END;
   }
   if (m.kind === 'fotos') {
@@ -1452,6 +1665,17 @@ function modalHtml(m) {
       '<button class="btn block" type="button" data-a="donoticia" data-x="rascunho"' + (S.busy ? ' disabled' : '') + '>' + (pub ? 'Tirar do ar (volta a rascunho)' : 'Salvar como rascunho') + '</button>' +
       (d.id ? '<button class="btn block danger" type="button" data-a="step" data-x="del">Excluir</button>' : '') + '</div>' + SHEET_END;
   }
+  if (m.kind === 'sugerir') {
+    return sheetOpen('Enviar sugestão') + sheetHd('Enviar sugestão') + '<p class="lead">Conte o que faltou, o que atrapalhou ou o que gostaria de ver no app. A mensagem vai direto para a administração.</p>' +
+      '<label class="fld">Sua sugestão<textarea data-f="texto" rows="5" maxlength="2000" placeholder="Escreva aqui">' + esc(d.texto || '') + '</textarea></label>' +
+      errLine(m) + busyBtn('dosugerir', 'Enviar', 'Enviando…') + SHEET_END;
+  }
+  if (m.kind === 'sugestao') {
+    return sheetOpen('Atualizar sugestão') + sheetHd('Atualizar sugestão') + '<p class="note sgt">' + esc(d.texto || '') + '</p>' +
+      '<div class="fld"><span>Situação</span>' + pickRow('pickstatus', [['nova', 'Nova'], ['em_analise', 'Em análise'], ['feita', 'Feita'], ['descartada', 'Descartada']], d.status) + '</div>' +
+      '<label class="fld">Nota interna (só você vê)<textarea data-f="nota" rows="3" maxlength="1000">' + esc(d.nota || '') + '</textarea></label>' +
+      errLine(m) + busyBtn('dosugestao', 'Salvar', 'Salvando…') + SHEET_END;
+  }
   if (m.kind === 'senha') {
     return sheetOpen('Trocar senha') + sheetHd('Trocar senha') + '<p class="lead">Use pelo menos 8 caracteres. A nova senha vale para todos os aparelhos.</p>' +
       '<label class="fld">Nova senha<input data-f="s1" type="password" autocomplete="new-password" value="' + esc(d.s1 || '') + '"></label>' +
@@ -1471,6 +1695,7 @@ function menuHtml(side) {
   var ab = countB(A.filter(function (id) { return paraAbrir(prod(id)); }));
   var th = PREF.theme || 'dark', pl = papel();
   var rasc = D.noticias.filter(function (n) { return n.status !== 'publicada'; }).length;
+  var sgNovas = D.sugs.filter(function (x) { return x.status === 'nova'; }).length;
   var adegasHtml = (S.me && S.me.is_admin && S.adegas.length) ? '<div class="dsec"><span class="lbl">Adegas</span>' + S.adegas.map(function (x) {
     return '<button class="adega-opt" type="button" data-a="adega" data-x="' + x.id + '" aria-current="' + (x.id === S.adegaId) + '"><i></i><span>' + esc(x.nome) + '</span><small>' + (x.garrafas ? plural(x.garrafas, 'garrafa', 'garrafas') : 'sem dados') + '</small></button>';
   }).join('') + '</div>' : '';
@@ -1482,20 +1707,28 @@ function menuHtml(side) {
       '<a class="dlink" href="#/vinhos" data-a="tab" data-x="#/vinhos"><span>Vinhos</span><small>' + plural(A.length, 'rótulo', 'rótulos') + '</small></a>' +
       '<a class="dlink" href="#/bar" data-a="tab" data-x="#/bar"><span>Bar e outros</span><small>' + plural(B.length, 'item', 'itens') + '</small></a>' +
       '<a class="dlink" href="' + hrefGroup('abrir', 'todos') + '"><span>Para abrir logo</span>' + (ab ? '<span class="cnt">' + ab + '</span>' : '') + '</a>' +
+      '<a class="dlink" href="#/consumidos"><span>Consumidos</span>' + (consumidos().length ? '<small>' + plural(consumidos().length, 'garrafa', 'garrafas') + '</small>' : '') + '</a>' +
       '<a class="dlink" href="#/historico"><span>Histórico</span></a>' +
       ((S.me && S.me.is_admin) || noticiasDaAdega().length ? '<a class="dlink" href="#/noticias"><span>Do mundo do vinho</span>' + (S.me && S.me.is_admin && rasc ? '<span class="cnt">' + rasc + '</span>' : '') + '</a>' : '') +
       '<a class="dlink" href="#/painel" data-a="tab" data-x="#/painel"><span>Painel</span></a>' +
       (canManage() ? '<button class="dlink" type="button" data-a="pessoas"><span>Pessoas com acesso</span><small>' + plural(D.membros.length, 'pessoa', 'pessoas') + '</small></button>' : '') +
+      (S.me && S.me.is_admin ? '<a class="dlink" href="#/ia"><span>Sugestões da IA</span>' + (D.ia.length ? '<span class="cnt">' + D.ia.length + '</span>' : '') + '</a>' +
+        '<a class="dlink" href="#/tabela"><span>Edição em massa</span></a>' +
+        '<a class="dlink" href="#/sugestoes"><span>Sugestões recebidas</span>' + (sgNovas ? '<span class="cnt">' + sgNovas + '</span>' : '') + '</a>' : '') +
       (S.me && S.me.is_admin ? '<button class="dlink" type="button" data-a="fotoslote"><span>Importar fotos do AppSheet</span>' + I.img + '</button>' : '') +
     '</div>' +
     '<div class="dsec"><span class="lbl">Aparência</span>' + seg('theme', [['system', 'Sistema'], ['dark', 'Escuro'], ['light', 'Claro']], th) + '</div>' +
     '<div class="dsec"><span class="lbl">Conta</span><div class="me" style="padding:var(--space-2) 0 var(--space-2)"><span class="av">' + esc((meuNome() || '?').charAt(0).toUpperCase()) + '</span><span style="min-width:0;display:flex;flex-direction:column;gap:2px"><b style="font-size:14.5px">' + esc(meuNome()) + '</b><span class="hint" style="font-size:12.5px;overflow:hidden;text-overflow:ellipsis">' + esc(S.me ? S.me.email : '') + '</span></span><span class="role" style="margin-left:auto">' + esc(PAPEL_NOME[pl] || '—') + '</span></div>' +
+      '<button class="dlink" type="button" data-a="sugerir"><span>Enviar sugestão</span>' + I.edit + '</button>' +
       '<button class="dlink" type="button" data-a="senha"><span>Trocar senha</span>' + I.key + '</button>' +
       '<button class="dlink" type="button" data-a="sync"><span>Atualizar dados</span>' + (S.ui.syncing ? '<span class="spin" aria-hidden="true"></span>' : I.refresh) + '</button>' +
       '<button class="dlink" type="button" data-a="sair"><span style="color:var(--wine-fg)">Sair</span>' + I.out + '</button></div>' +
-    '<div class="dsec" style="border-bottom:0;margin-top:auto"><p class="hint" style="margin:0;font-size:12px">App Adega ' + VERSION + (S.ui.syncedAt ? ' · dados de ' + fmtTime(S.ui.syncedAt) : '') + '</p></div>' +
+    '<div class="dsec" style="border-bottom:0;margin-top:auto"><a class="dlink sobre" href="#/sobre"><span>Sobre o app</span><small>versão ' + VERSION + '</small></a>' + (S.ui.syncedAt ? '<p class="hint" style="margin:0;font-size:12px">Dados de ' + fmtTime(S.ui.syncedAt) + '</p>' : '') + '</div>' +
     '';
   if (side) return body;
+  // no celular, o item da tela aberta ganha a mesma marca dourada do desktop
+  var cur = routeHash(S.route.name === 'vinho' && S.listRoute ? S.listRoute : S.route);
+  body = body.replace('class="dlink" href="' + cur + '"', 'class="dlink" aria-current="page" href="' + cur + '"');
   return '<div class="layer drawer"><div class="scrim" data-a="close"></div><div class="dpan" role="dialog" aria-modal="true" aria-label="Menu" tabindex="-1" data-panel>' + body + '</div></div>';
 }
 function sideHtml(lr) {
@@ -1548,6 +1781,11 @@ function render() {
     else if (lr.name === 'busca') html = viewBusca();
     else if (lr.name === 'historico') html = viewHistorico();
     else if (lr.name === 'noticias') html = viewNoticias();
+    else if (lr.name === 'consumidos') html = viewConsumidos();
+    else if (lr.name === 'sugestoes') html = viewSugestoes();
+    else if (lr.name === 'ia') html = viewIA();
+    else if (lr.name === 'tabela') html = viewTabela();
+    else if (lr.name === 'sobre') html = viewSobre();
     else html = viewHome();
   }
   var screenKey = S.phase + ':' + routeKey(lr);
@@ -1562,6 +1800,8 @@ function render() {
       '<a href="#/bar" data-a="tab" data-x="#/bar"' + (bar ? ' aria-current="page"' : '') + '>' + I.bar + 'Bar</a>' +
       '<a href="#/painel" data-a="tab" data-x="#/painel"' + (t === 'painel' ? ' aria-current="page"' : '') + '>' + I.chart + 'Painel</a></nav>' +
       (canWrite() ? '<button class="fab" type="button" data-a="entrada" data-x="' + (bar ? 'bar' : '') + '" aria-label="' + (bar ? 'Nova entrada no bar' : 'Nova entrada de vinho') + '">' + I.plus + '</button>' : '') + '</div>';
+  } else if (S.phase === 'app' && r.name === 'grupo' && !wide && canWrite()) {
+    dockHtml = '<div class="dock solo"><button class="fab" type="button" data-a="entrada" data-x="' + (r.secao === 'bar' ? 'bar' : '') + '" aria-label="' + (r.secao === 'bar' ? 'Nova entrada no bar' : 'Nova entrada de vinho') + '">' + I.plus + '</button></div>';
   } else if (S.phase === 'app' && r.name === 'vinho' && !wide) dockHtml = fichaActions(r.id);
   morph(dock, dockHtml);
   var root = document.documentElement, dEl = document.getElementById('detail'), sEl = document.getElementById('side');
@@ -1649,13 +1889,13 @@ function revisar() {
   if (m.kind === 'editar') {
     if (!yearOk(d.janela_inicio) || !yearOk(d.janela_fim)) { m.err = 'Use anos com quatro dígitos, como 2030.'; return renderLayer(); }
     if (d.janela_inicio && d.janela_fim && +d.janela_fim < +d.janela_inicio) { m.err = 'O fim da janela precisa ser igual ou depois do início.'; return renderLayer(); }
-    if (m.more && !String(d.nome || '').trim()) { m.err = 'O nome não pode ficar vazio.'; return renderLayer(); }
-    if (m.more && !yearOk(d.safra)) { m.err = 'Safra com quatro dígitos, ou em branco para NV.'; return renderLayer(); }
+    if (m.moreUsed && !String(d.nome || '').trim()) { m.err = 'O nome não pode ficar vazio.'; return renderLayer(); }
+    if (m.moreUsed && !yearOk(d.safra)) { m.err = 'Safra com quatro dígitos, ou em branco para NV.'; return renderLayer(); }
     var ch = [], patchObj = {};
     function cmpf(key, label, val, orig, show) { var a = (val == null ? '' : String(val).trim()), b = (orig == null ? '' : String(orig)); if (a !== b) { ch.push([label, show ? show(b) : b, show ? show(a) : a]); patchObj[key] = a; } }
     if (p.secao !== 'bar') { cmpf('avaliacao', 'Avaliação', d.avaliacao, p.avaliacao); cmpf('janela_inicio', 'Beber a partir de', d.janela_inicio, p.janela_inicio); cmpf('janela_fim', 'Beber até', d.janela_fim, p.janela_fim); }
     cmpf('notas', 'Notas', d.notas, p.notas);
-    if (m.more) {
+    if (m.moreUsed) {
       cmpf('nome', 'Nome', d.nome, p.nome); cmpf('produtor', 'Produtor', d.produtor, p.produtor);
       var sOrig = p.safra ? String(p.safra) : '';
       if (String(d.safra || '').trim() !== sOrig) { ch.push(['Safra', sOrig || 'NV', String(d.safra || '').trim() || 'NV']); patchObj.safra = String(d.safra || '').trim(); patchObj.sem_safra = !String(d.safra || '').trim(); }
@@ -1695,7 +1935,7 @@ function doConsumir() {
   return run('doconsumir', function () {
     return API.rpc('consumir_garrafa', { p_garrafa: g.id, p_data: d.data || todayISO(), p_ocasiao: d.oc || null, p_com_quem: d.cq || null, p_nota: d.nota || null }).then(function (mov) {
       var prev = g.local_id;
-      g.status = 'consumida'; g.local_id = null; D.movs.unshift(mov); derive();
+      g.status = 'consumida'; g.local_id = null; D.movs.unshift(mov); D.cons.unshift(mov); derive();
       if (S.ficha[m.pid]) S.ficha[m.pid].movs.unshift(mov);
       closeModal(); render(); snapshot();
       var p = prod(m.pid);
@@ -1745,6 +1985,7 @@ function doEditar() {
       D.produtos.set(m.pid, merged); derive();
       closeModal(); render(); snapshot(); loadFicha(m.pid);
       toast('Alterações salvas.');
+      if (merged.secao !== 'bar' && (('nome' in m.patch) || ('produtor' in m.patch) || ('safra' in m.patch))) pedirIA(m.pid);
     });
   });
 }
@@ -1769,6 +2010,7 @@ function doEntrada() {
         refreshResumo();
         if (kind === 'adicionar') { closeModal(); render(); loadFicha(pid); }
         else leaveModal(function () { go('#/v/' + pid); });
+        if (kind === 'entrada' && !d.bar) pedirIA(pid);
         if (fotoOk === false) toast(plural(qtd, 'garrafa guardada', 'garrafas guardadas') + ', mas a foto não subiu. Adicione pela ficha.', { err: true });
         else toast(plural(qtd, 'garrafa guardada', 'garrafas guardadas') + '.');
       });
@@ -1841,6 +2083,25 @@ function doApagarNoticia() {
     });
   });
 }
+function doSugerir() {
+  var m = S.modal, t = String(m.draft.texto || '').trim();
+  if (t.length < 3) { m.err = MSG.sugestao_invalida; return renderLayer(); }
+  return run('dosugerir', function () {
+    return API.rpc('enviar_sugestao', { p_texto: t, p_adega: S.adegaId }).then(function () {
+      closeModal(); toast('Sugestão enviada. Obrigado!');
+      if (S.me && S.me.is_admin) sync(true);
+    });
+  });
+}
+function doSugestao() {
+  var m = S.modal, d = m.draft;
+  return run('dosugestao', function () {
+    return API.rpc('atualizar_sugestao', { p_id: d.id, p_status: d.status, p_nota: d.nota || '' }).then(function (n) {
+      D.sugs = D.sugs.map(function (x) { return x.id === n.id ? { id: n.id, adega_id: n.adega_id, autor: n.autor, texto: n.texto, status: n.status, nota_interna: n.nota_interna, criado_em: n.criado_em } : x; });
+      closeModal(); render(); toast('Sugestão atualizada.');
+    });
+  });
+}
 function doSenha() {
   var m = S.modal, d = m.draft;
   if (String(d.s1 || '').length < 8) { m.err = MSG.senha_fraca; return renderLayer(); }
@@ -1873,6 +2134,7 @@ function lerRotulo(file) {
     if (d.bar) { if (x.categoria && !String(d.categoria || '').trim()) fill.categoria = grafiaDaAdega('categoria', x.categoria); }
     else if (x.estilo && STYLE_ONE[x.estilo]) fill.estilo = x.estilo;
     Object.keys(fill).forEach(function (k) { d[k] = fill[k]; });
+    m.lidos = m.lidos || {}; Object.keys(fill).forEach(function (k) { m.lidos[k] = 1; });
     m.leitura = 'ok'; m.sugF = null; renderLayer();
     Object.keys(fill).forEach(function (k) { var el = document.querySelector('.sheet [data-f="' + k + '"]'); if (el) el.value = fill[k]; });
   }).catch(function (e) {
@@ -2012,9 +2274,17 @@ document.addEventListener('click', function (ev) {
     case 'consumir': if (!guardOnline()) break; openModal({ kind: 'consumir', pid: x, draft: { data: todayISO() } }); break;
     case 'mover': if (!guardOnline()) break; openModal({ kind: 'mover', pid: x }); break;
     case 'editar': if (!guardOnline()) break; var pe = prod(x); openModal({ kind: 'editar', pid: x, draft: { avaliacao: pe.avaliacao || '', janela_inicio: pe.janela_inicio || '', janela_fim: pe.janela_fim || '', notas: pe.notas || '', nome: pe.nome, produtor: pe.produtor || '', safra: pe.safra || '', pais: pe.pais || '', regiao: pe.regiao || '', estilo: pe.estilo || '', categoria: pe.categoria || '' } }); break;
-    case 'entrada': if (!canWrite() || !guardOnline()) return; openModal({ kind: 'entrada', draft: { bar: x === 'bar' || S.route.name === 'bar', qtd: 1, estilo: 'tinto', moeda: 'USD' } }); break;
+    case 'entrada': if (!canWrite() || !guardOnline()) return;
+      var er = (S.route.name === 'vinho' && S.listRoute) ? S.listRoute : S.route;
+      var dn = { bar: x === 'bar' || er.name === 'bar' || er.secao === 'bar', qtd: 1, estilo: 'tinto', moeda: 'USD' };
+      if (er.name === 'grupo' && er.chave && er.chave !== '—') {   // dentro de um grupo, já abre com o que o grupo diz
+        if (er.modo === 'pais') dn.pais = er.chave;
+        if (er.modo === 'tipo' && STYLE_ONE[er.chave]) dn.estilo = er.chave;
+        if (er.modo === 'cat') dn.categoria = er.chave;
+      }
+      openModal({ kind: 'entrada', draft: dn }); break;
     case 'adicionar': if (!guardOnline()) break; openModal({ kind: 'adicionar', pid: x, draft: { qtd: 1, moeda: 'USD' } }); break;
-    case 'more': if (m) { m.more = true; renderLayer({ step: true }); } break;
+    case 'more': if (m) { m.more = !m.more; if (m.more) m.moreUsed = true; renderLayer({ step: true }); } break;
     case 'step': if (m) { m.step = x; m.err = null; renderLayer({ step: true }); var sh = document.querySelector('.sheet'); if (sh) sh.scrollTop = 0; } break;
     case 'revisar': revisar(); var sh2 = document.querySelector('.sheet'); if (sh2) sh2.scrollTop = 0; break;
     case 'pickloc': if (m) { m.draft.loc = x; m.err = null; renderLayer(); } break;
@@ -2031,6 +2301,18 @@ document.addEventListener('click', function (ev) {
     case 'doeditar': doEditar(); break;
     case 'doentrada': doEntrada(); break;
     case 'dosenha': doSenha(); break;
+    case 'sugerir': if (!guardOnline()) break; if (m) { leaveModal(function () { openModal({ kind: 'sugerir', draft: {} }); }); } else openModal({ kind: 'sugerir', draft: {} }); break;
+    case 'dosugerir': doSugerir(); break;
+    case 'sgf': S.ui.sgf = x; render(); break;
+    case 'sugestao': if (!guardOnline()) break; var sg = D.sugs.filter(function (q) { return q.id === x; })[0]; if (sg) openModal({ kind: 'sugestao', draft: { id: sg.id, texto: sg.texto, status: sg.status, nota: sg.nota_interna || '' } }); break;
+    case 'pickstatus': if (m) { m.draft.status = x; renderLayer(); } break;
+    case 'dosugestao': doSugestao(); break;
+    case 'pediria': if (guardOnline()) pedirIA(x, true); break;
+    case 'iaok': iaRevisar(x, true); break;
+    case 'iano': iaRevisar(x, false); break;
+    case 'tbf': S.ui.tb.f = x; S.ui.tb.lim = 150; render(); break;
+    case 'tbfora': S.ui.tb.fora = !S.ui.tb.fora; render(); break;
+    case 'tbmais': S.ui.tb.lim += 150; render(); break;
     case 'sug': if (m && m.sugItems && m.sugItems[+x]) { var fl = m.sugItems[+x].fill; Object.keys(fl).forEach(function (k) { m.draft[k] = fl[k]; var e2 = document.querySelector('.sheet [data-f="' + k + '"]'); if (e2) e2.value = fl[k]; }); m.sugF = null; m.sugItems = null; renderLayer(); } break;
     case 'maisareas': if (m) { m.maisAreas = true; renderLayer({ step: true }); } break;
     case 'efotodel': if (m) { if (m.fotoUrl) URL.revokeObjectURL(m.fotoUrl); m.foto = null; m.fotoUrl = null; m.leitura = null; renderLayer(); } break;
@@ -2045,9 +2327,11 @@ document.addEventListener('click', function (ev) {
 document.addEventListener('input', function (ev) {
   var t = ev.target;
   if (t.id === 'q') { S.ui.q = t.value; render(); return; }
+  if (t.id === 'tq' && S.ui.tb) { S.ui.tb.q = t.value; S.ui.tb.lim = 150; render(); return; }
   var f = t.getAttribute && t.getAttribute('data-f');
   if (f && S.modal) {
     S.modal.draft[f] = t.value;
+    if (S.modal.lidos && S.modal.lidos[f]) { delete S.modal.lidos[f]; t.removeAttribute('data-lido'); }
     if (S.modal.kind === 'entrada' && S.modal.step !== 'conf') { var sf = /^(nome|produtor|pais|regiao)$/.test(f) ? f : null; if (sf || S.modal.sugF || f === 'safra') { S.modal.sugF = sf; renderLayer(); } }
     if (f === 'termos' && S.modal.kind === 'noticia') { var lg = document.getElementById('n-liga'); if (lg) lg.textContent = ligaTxt(t.value); }
     if (f === 'nicho' && t.value) { S.modal.draft.area = null; var on = document.querySelector('[data-a="pickarea"][aria-pressed="true"]'); if (on) on.setAttribute('aria-pressed', 'false'); }
@@ -2056,6 +2340,7 @@ document.addEventListener('input', function (ev) {
 });
 document.addEventListener('change', function (ev) {
   var t = ev.target;
+  if (t.getAttribute && t.getAttribute('data-tb')) { tbSave(t); return; }
   if (t.id === 'f-foto' && t.files && t.files[0]) uploadFoto(t.files[0], t.getAttribute('data-p'));
   if ((t.id === 'f-lote' || t.id === 'f-lote2') && t.files && t.files.length) importarFotos(t.files);
   if ((t.id === 'f-ecam' || t.id === 'f-egal') && t.files && t.files[0] && S.modal && S.modal.kind === 'entrada') {
@@ -2086,6 +2371,10 @@ document.addEventListener('keydown', function (ev) {
     return;
   }
   if (ev.key === 'Enter' && ev.target.id === 'q') ev.target.blur();
+  if (ev.key === 'Enter' && ev.target.getAttribute && ev.target.getAttribute('data-tb')) {   // tabela: Enter grava e desce uma linha
+    var tr = ev.target.closest('tr'), nx = tr && tr.nextElementSibling, alvo = nx && nx.querySelector('[data-tb="' + ev.target.getAttribute('data-tb') + '"]');
+    ev.preventDefault(); if (alvo) { alvo.focus(); if (alvo.select) alvo.select(); } else ev.target.blur();
+  }
 });
 window.addEventListener('online', function () { S.ui.offline = false; render(); if (S.phase === 'app') sync(true); });
 window.addEventListener('offline', function () { S.ui.offline = true; render(); });

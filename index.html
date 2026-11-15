@@ -339,6 +339,60 @@ a.card:active{transform:scale(.97)}
 .nact .btn{height:40px;border-radius:20px;font-size:13.5px;padding:0 var(--space-4)}
 .nact .btn .i{width:16px;height:16px}
 
+/* ---------- v1.8 ---------- */
+/* botão + sozinho nas listas de grupo */
+.dock.solo{justify-content:flex-end;background:none}
+/* janela de consumo discreta */
+.jdot{display:inline-block;width:8px;height:8px;border-radius:4px;background:var(--gold);margin-left:var(--space-2);vertical-align:middle;flex:none}
+.jinfo{font-size:13.5px;color:var(--muted)}
+/* campo preenchido pela leitura do rótulo, até ser editado */
+.fld [data-lido]{border-color:var(--gold);background:var(--gold-bg)}
+/* seção que abre e fecha */
+.disc{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);min-height:44px;width:100%;text-align:left;font-size:14px;font-weight:600;color:var(--gold-fg);border-top:1px solid var(--line);padding-top:var(--space-1)}
+.disc .i{width:18px;height:18px;flex:none;transition:transform .2s var(--ease)}
+.disc[aria-expanded="true"] .i{transform:rotate(90deg)}
+/* topo do início: o brilho dourado vem inteiro desde o alto; a barra entra ao rolar */
+.top.htop{background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;transition:background .25s var(--ease),border-color .2s}
+.top.htop .ttl{opacity:0;transition:opacity .25s var(--ease)}
+.top.htop.scrolled{background:color-mix(in srgb,var(--bg) 92%,transparent);-webkit-backdrop-filter:saturate(1.4) blur(14px);backdrop-filter:saturate(1.4) blur(14px)}
+.top.htop.scrolled .ttl{opacity:1}
+/* menu lateral no celular: mais estreito, com fio dourado como o campo de busca */
+.drawer .dsec{padding:var(--space-3) var(--space-4)}
+.drawer .dlink{min-height:44px;font-size:14.5px;padding:0 var(--space-3);margin:0 calc(var(--space-3) * -1);width:calc(100% + var(--space-5))}
+.dlink[aria-current="page"]{background:var(--gold-bg);color:var(--gold-fg);box-shadow:inset 0 0 0 1px var(--gold-line);font-weight:600}
+/* sugestões e IA */
+.sgt{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--fg)!important;font-size:14.5px!important}
+.iarow{display:flex;flex-direction:column;gap:var(--space-2);padding-top:var(--space-3);border-top:1px solid var(--line)}
+.iat{font-size:14.5px;line-height:1.4}
+.iat b{font-weight:600}
+.iaf{color:var(--gold-fg);overflow-wrap:anywhere}
+.iaf .i{display:inline-block;width:13px;height:13px;margin-left:var(--space-1);vertical-align:-1px}
+/* sobre o app */
+.sobre .panel{margin-top:var(--space-4)}
+.vlist{margin:0;padding-left:var(--space-5);display:flex;flex-direction:column;gap:var(--space-1);font-size:14px;line-height:1.45;color:var(--fg2)}
+.vt{margin:0;font-weight:600;font-size:14px}
+.vold{display:flex;flex-direction:column;gap:var(--space-2)}
+.vold+.vold{margin-top:var(--space-2);padding-top:var(--space-3);border-top:1px solid var(--line)}
+/* edição em massa */
+.tbbar{margin-top:var(--space-4)}
+.tbq{flex:none;max-width:420px;height:40px;border-color:var(--line2)}
+.tbq input{height:38px;font-size:14px}
+.tbbar .chips{flex-wrap:wrap;overflow:visible;-webkit-mask-image:none;mask-image:none;padding-top:var(--space-3)}
+.tbwrap{margin-top:var(--space-3);overflow:auto;max-height:calc(100dvh - 320px);border:1px solid var(--line);border-radius:12px;background:var(--surface)}
+.tb{border-collapse:collapse;width:100%;min-width:1340px;font-size:13.5px}
+.tb th{position:sticky;top:0;z-index:1;background:var(--surface2);text-align:left;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;padding:var(--space-2);border-bottom:1px solid var(--line);white-space:nowrap}
+.tb td{padding:0;border-bottom:1px solid var(--line);border-right:1px solid var(--line)}
+.tb input,.tb select{width:100%;height:40px;border:0;border-radius:0;background:transparent;padding:0 var(--space-2);font-size:13.5px;outline:none;-webkit-appearance:none;appearance:none}
+.tb input:focus,.tb select:focus{box-shadow:inset 0 0 0 2px var(--gold);background:var(--bg)}
+.tb [data-st="salvando"]{background:var(--surface2)}
+.tb [data-st="ok"]{box-shadow:inset 0 0 0 2px var(--ok)}
+.tb [data-st="erro"]{box-shadow:inset 0 0 0 2px var(--wine)}
+.tb .c-nome{min-width:240px}.tb .c-produtor{min-width:180px}.tb .c-pais{min-width:110px}.tb .c-regiao{min-width:170px}.tb .c-estilo{min-width:130px}.tb .c-pontuacoes{min-width:170px}.tb .c-notas{min-width:220px}
+.tb .c-safra,.tb .c-janela_inicio,.tb .c-janela_fim,.tb .c-avaliacao{width:72px}
+.tb .c-n{width:48px;text-align:center;color:var(--muted)}
+.tb .c-l{width:40px;border-right:0}
+.tb .c-l a{display:flex;height:40px;align-items:center;justify-content:center;color:var(--muted)}
+
 /* ---------- login ---------- */
 .login{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding-top:calc(var(--sat) + var(--space-5));padding-bottom:calc(var(--sab) + var(--space-5))}
 .login h1{margin:0;font-family:var(--serif);font-weight:500;font-size:40px;line-height:1.08;letter-spacing:-.01em}
@@ -390,7 +444,7 @@ dl.conf dd{margin:0;min-width:0;overflow-wrap:anywhere}
 dl.conf dd b{color:var(--gold-fg)}
 .stack-btn{display:flex;flex-direction:column;gap:var(--space-3)}
 .drawer{justify-content:flex-start;align-items:stretch;flex-direction:row}
-.drawer .dpan{position:relative;width:min(340px,86%);height:100%;overflow:auto;overscroll-behavior:contain;background:var(--bg-raise);border-right:1px solid var(--line);display:flex;flex-direction:column;padding-top:var(--sat);padding-bottom:var(--sab);transform:translateX(-104%);transition:transform .28s var(--ease);box-shadow:var(--shadow)}
+.drawer .dpan{position:relative;width:min(304px,82%);height:100%;overflow:auto;overscroll-behavior:contain;background:var(--bg-raise);border-right:1px solid var(--gold-line);display:flex;flex-direction:column;padding-top:var(--sat);padding-bottom:var(--sab);transform:translateX(-104%);transition:transform .28s var(--ease);box-shadow:0 0 0 5px color-mix(in srgb,var(--gold) 7%,transparent),var(--shadow)}
 .drawer.open .dpan{transform:none}
 .dsec{padding:var(--space-4) var(--space-5);border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:var(--space-1)}
 .dsec:last-child{border-bottom:0}
@@ -472,9 +526,8 @@ html.vt-flat .top,html.vt-flat .dock,html.vt-flat .actions{view-transition-name:
   html.sideon #screen .content{padding-bottom:var(--space-8)}
   html.sideon .toasts{bottom:24px;left:calc(50% + 132px)}
   #side .dsec [data-a=close]{display:none}
-  #side .dlink{padding:0 var(--space-3);margin:0 calc(var(--space-3) * -1);width:calc(100% + 20px)}
+  #side .dlink{padding:0 var(--space-3);margin:0 calc(var(--space-3) * -1);width:calc(100% + var(--space-5))}
   #side .dlink:hover,#side .adega-opt:hover{background:var(--surface)}
-  #side .dlink[aria-current="page"]{background:var(--gold-bg);color:var(--gold-fg);box-shadow:inset 0 0 0 1px var(--gold-line);font-weight:600}
   .stools{padding:var(--space-5) var(--space-5) var(--space-1);display:flex;flex-direction:column;gap:var(--space-3)}
   .ssearch{display:flex;align-items:center;gap:var(--space-3);height:44px;padding:0 var(--space-3);border-radius:12px;border:1px solid var(--line2);background:var(--surface);color:var(--muted);font-size:14px;transition:border-color .15s}
   .ssearch:hover{border-color:var(--gold)}
@@ -511,6 +564,7 @@ html.vt-flat .top,html.vt-flat .dock,html.vt-flat .actions{view-transition-name:
   .nlist{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
   .nbar{flex-direction:row;align-items:center}
   .nbtns{flex:none}
+  html.sideon #screen>main.tbl{max-width:none}
   .hcols>:only-child{grid-column:1/-1}
   .hcols>:only-child .hxs{grid-template-columns:repeat(4,minmax(0,1fr))}
 }

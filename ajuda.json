@@ -1,0 +1,118 @@
+{
+  "grupos": [
+    {
+      "titulo": "Começando",
+      "perguntas": [
+        {
+          "p": "Como coloco o app na tela inicial do celular?",
+          "r": [
+            "No iPhone: abra o endereço do app no Safari, toque em Compartilhar e depois em “Adicionar à Tela de Início”.",
+            "No Android: abra no Chrome, toque nos três pontinhos e depois em “Instalar app” ou “Adicionar à tela inicial”.",
+            "Depois disso ele abre como um aplicativo, em tela cheia."
+          ]
+        },
+        {
+          "p": "Funciona sem internet?",
+          "r": [
+            "Para consultar, sim: o app guarda a última cópia da adega e mostra um aviso de que está sem conexão.",
+            "Para registrar uma garrafa aberta, uma entrada ou uma mudança de lugar, é preciso estar com internet."
+          ]
+        },
+        {
+          "p": "Como troco a minha senha?",
+          "r": ["Abra o menu e toque em “Trocar senha”. A senha nova vale para todos os aparelhos."]
+        },
+        {
+          "p": "O app avisou “Nova versão disponível”. O que faço?",
+          "r": ["Toque no aviso para atualizar. Os dados da adega não mudam; só o app fica mais novo. O que mudou em cada versão está em Menu › Sobre o app."]
+        }
+      ]
+    },
+    {
+      "titulo": "Encontrar um vinho",
+      "perguntas": [
+        {
+          "p": "Como procuro um vinho?",
+          "r": [
+            "Use a busca do início. Ela procura por nome, produtor, região, país, safra, número do nicho e também pelas notas.",
+            "Não precisa escrever certinho: a busca aceita um erro de letra e mostra em que campo achou."
+          ]
+        },
+        {
+          "p": "Como vejo a adega por país, tipo, avaliação ou lugar?",
+          "r": ["Na aba Vinhos, escolha País, Avaliação, Tipo ou Local no alto da lista. Toque num grupo para ver os vinhos dele."]
+        },
+        {
+          "p": "O que é a janela de consumo?",
+          "r": [
+            "É o período em que o vinho está no melhor momento para ser aberto, do ano inicial ao ano final.",
+            "Na ficha do vinho há uma barra com a janela e a posição do ano atual."
+          ]
+        },
+        {
+          "p": "O que é o ponto âmbar ao lado do nome de um vinho?",
+          "r": ["Indica que o vinho está no último ano da janela de consumo ou já passou dela. A lista completa fica em Menu › Para abrir logo."]
+        }
+      ]
+    },
+    {
+      "titulo": "Registrar",
+      "perguntas": [
+        {
+          "p": "Abri uma garrafa. Como registro?",
+          "r": [
+            "Abra a ficha do vinho e toque em “Abrir uma garrafa”. Se houver garrafas em lugares diferentes, escolha de onde ela saiu, revise e confirme.",
+            "A garrafa sai do estoque e o nicho fica livre na hora."
+          ]
+        },
+        {
+          "p": "Registrei por engano. Dá para desfazer?",
+          "r": [
+            "Sim. Logo depois de confirmar aparece um aviso com o botão “Desfazer”; toque nele e a garrafa volta para o lugar.",
+            "Se o nicho já tiver recebido outra garrafa, o app avisa e não desfaz, para não colocar duas no mesmo lugar."
+          ]
+        },
+        {
+          "p": "Como cadastro uma garrafa nova?",
+          "r": [
+            "Toque no botão + e preencha os dados. Se tirar uma foto do rótulo, o app lê e preenche os campos para você; os que ele preencheu ficam marcados em dourado até você conferir.",
+            "Informe o nicho ou a área onde a garrafa vai ficar, toque em Revisar e confirme."
+          ]
+        },
+        {
+          "p": "O vinho já está cadastrado. Como adiciono mais garrafas?",
+          "r": ["Na ficha do vinho, toque em “+ Adicionar”. Assim as garrafas novas entram no mesmo rótulo, sem duplicar o cadastro."]
+        },
+        {
+          "p": "Como mudo uma garrafa de lugar?",
+          "r": ["Na ficha do vinho, toque em “Mover”, escolha a garrafa e informe o novo nicho ou a nova área."]
+        },
+        {
+          "p": "Como corrijo os dados de um vinho?",
+          "r": ["Na ficha do vinho, toque em “Editar”. Dá para ajustar avaliação, janela de consumo e notas; em “Nome, produtor, safra e origem” ficam os outros campos."]
+        },
+        {
+          "p": "Onde vejo o que já foi aberto?",
+          "r": ["Em Menu › Consumidos, do mais recente ao mais antigo, com a data, quem registrou e de onde a garrafa saiu. O Histórico mostra também entradas, mudanças de lugar e edições."]
+        },
+        {
+          "p": "Não vejo os botões de registrar. Por quê?",
+          "r": ["O seu acesso pode ser só de consulta. Nesse caso dá para ver tudo, mas não registrar. Fale com quem administra a adega."]
+        }
+      ]
+    },
+    {
+      "titulo": "Ajuda e privacidade",
+      "perguntas": [
+        {
+          "p": "Quem pode ver a minha adega?",
+          "r": ["Só as pessoas que têm acesso a ela e a administração do app. Ninguém de fora vê os seus vinhos."]
+        },
+        {
+          "p": "Achei um problema ou tenho uma ideia. Como aviso?",
+          "r": ["Abra o menu e toque em “Enviar sugestão”. A mensagem vai direto para a administração."]
+        }
+      ]
+    }
+  ]
+}

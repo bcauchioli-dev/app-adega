@@ -7,6 +7,14 @@
   ],
   "versoes": [
     {
+      "versao": "1.9.0",
+      "data": "2026-11-15",
+      "titulo": "Dúvidas frequentes",
+      "mudancas": [
+        "Nova tela de dúvidas frequentes no menu, com o passo a passo do que mais se usa no app."
+      ]
+    },
+    {
       "versao": "1.8.1",
       "data": "2026-11-15",
       "titulo": "Ajustes na tela Sobre",

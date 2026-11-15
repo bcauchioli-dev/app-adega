@@ -3,7 +3,7 @@
 (function () {
 'use strict';
 
-var VERSION = '1.8.1';
+var VERSION = '1.9.0';
 var CFG = window.APP_CONFIG || {};
 var YEAR = new Date().getFullYear();
 var STYLE_ORDER = ['tinto', 'branco', 'rosé', 'espumante', 'doce/fortificado'];
@@ -471,7 +471,7 @@ if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (P
 var WIDE = window.matchMedia ? window.matchMedia('(min-width: 960px)') : null;
 function isWide() { return !!(WIDE && WIDE.matches); }
 if (WIDE && WIDE.addEventListener) WIDE.addEventListener('change', function () { render(); });
-var DEPTH = { home: 0, vinhos: 0, bar: 0, painel: 0, grupo: 1, busca: 1, historico: 1, noticias: 1, consumidos: 1, sugestoes: 1, ia: 1, tabela: 1, sobre: 1, vinho: 2 };
+var DEPTH = { home: 0, vinhos: 0, bar: 0, painel: 0, grupo: 1, busca: 1, historico: 1, noticias: 1, consumidos: 1, sugestoes: 1, ia: 1, tabela: 1, sobre: 1, ajuda: 1, vinho: 2 };
 function parseHash() {
   var h = location.hash.replace(/^#\/?/, '');
   var parts = h ? h.split('/').map(function (x) { try { return decodeURIComponent(x); } catch (e) { return x; } }) : [];
@@ -487,6 +487,7 @@ function parseHash() {
     case 'ia': return { name: 'ia' };
     case 'tabela': return { name: 'tabela' };
     case 'sobre': return { name: 'sobre' };
+    case 'ajuda': return { name: 'ajuda' };
     case 'g': return { name: 'grupo', modo: parts[1] || 'pais', chave: parts.slice(2).join('/'), secao: parts[1] === 'cat' ? 'bar' : null };
     case 'b': return { name: 'grupo', modo: parts[1] || 'cat', chave: parts.slice(2).join('/'), secao: 'bar' };
     case 'v': return { name: 'vinho', id: parts[1] };
@@ -1440,6 +1441,25 @@ function loadVersoes() {
     .then(function (j) { S.versoes = j; }, function () { S.versoes = { erro: true }; })
     .then(function () { S.versoesBusy = false; if (S.route.name === 'sobre') render(); });
 }
+/* ---------- dúvidas frequentes (conteúdo em ajuda.json) ---------- */
+function loadAjuda() {
+  if (S.ajuda || S.ajudaBusy) return; S.ajudaBusy = true;
+  fetch('./ajuda.json', { cache: 'no-cache' }).then(function (r) { if (!r.ok) throw new Error('http'); return r.json(); })
+    .then(function (j) { S.ajuda = j; }, function () { S.ajuda = { erro: true }; })
+    .then(function () { S.ajudaBusy = false; if (S.route.name === 'ajuda') render(); });
+}
+function viewAjuda() {
+  var head = topBar(btnBack('#/'), 'Dúvidas frequentes', 'Como usar o app', '', true), v = S.ajuda, ab = S.ui.faq || {};
+  if (!v) { loadAjuda(); return head + '<main class="wrap content">' + skeletonRows(5) + '</main>'; }
+  if (v.erro) { S.ajuda = null; return head + '<main class="wrap content">' + emptyState('Sem conexão', 'Não deu para carregar as dúvidas frequentes agora. Tente de novo quando a internet voltar.') + '</main>'; }
+  return head + '<main class="wrap content sobre">' + (v.grupos || []).map(function (g, gi) {
+    return '<section class="panel"><h2>' + esc(g.titulo) + '</h2><div class="faqs">' + (g.perguntas || []).map(function (q, qi) {
+      var k = gi + '-' + qi, on = !!ab[k];
+      return '<div class="faq" data-k="fq:' + k + '"><button class="fq" type="button" data-a="faq" data-x="' + k + '" aria-expanded="' + on + '"><span>' + esc(q.p) + '</span>' + I.chev + '</button>' +
+        (on ? '<div class="fa">' + (q.r || []).map(function (t) { return '<p>' + esc(t) + '</p>'; }).join('') + '</div>' : '') + '</div>';
+    }).join('') + '</div></section>';
+  }).join('') + '<p class="hint" style="padding:var(--space-4) 2px 0">Não achou a resposta? Use o menu › Enviar sugestão.</p></main>';
+}
 function viewSobre() {
   var head = topBar(btnBack('#/'), 'Sobre o app', 'App Adega · versão ' + VERSION, '', true), v = S.versoes;
   if (!v) { loadVersoes(); return head + '<main class="wrap content">' + skeletonRows(4) + '</main>'; }
@@ -1723,7 +1743,7 @@ function menuHtml(side) {
       '<button class="dlink" type="button" data-a="senha"><span>Trocar senha</span>' + I.key + '</button>' +
       '<button class="dlink" type="button" data-a="sync"><span>Atualizar dados</span>' + (S.ui.syncing ? '<span class="spin" aria-hidden="true"></span>' : I.refresh) + '</button>' +
       '<button class="dlink" type="button" data-a="sair"><span style="color:var(--wine-fg)">Sair</span>' + I.out + '</button></div>' +
-    '<div class="dsec" style="border-bottom:0;margin-top:auto"><a class="dlink sobre" href="#/sobre"><span>Sobre o app</span><small>versão ' + VERSION + '</small></a>' + (S.ui.syncedAt ? '<p class="hint" style="margin:0;font-size:12px">Dados de ' + fmtTime(S.ui.syncedAt) + '</p>' : '') + '</div>' +
+    '<div class="dsec" style="border-bottom:0;margin-top:auto"><a class="dlink" href="#/ajuda"><span>Dúvidas frequentes</span></a><a class="dlink sobre" href="#/sobre"><span>Sobre o app</span><small>versão ' + VERSION + '</small></a>' + (S.ui.syncedAt ? '<p class="hint" style="margin:0;font-size:12px">Dados de ' + fmtTime(S.ui.syncedAt) + '</p>' : '') + '</div>' +
     '';
   if (side) return body;
   // no celular, o item da tela aberta ganha a mesma marca dourada do desktop
@@ -1786,6 +1806,7 @@ function render() {
     else if (lr.name === 'ia') html = viewIA();
     else if (lr.name === 'tabela') html = viewTabela();
     else if (lr.name === 'sobre') html = viewSobre();
+    else if (lr.name === 'ajuda') html = viewAjuda();
     else html = viewHome();
   }
   var screenKey = S.phase + ':' + routeKey(lr);
@@ -2305,6 +2326,7 @@ document.addEventListener('click', function (ev) {
     case 'dosugerir': doSugerir(); break;
     case 'sgf': S.ui.sgf = x; render(); break;
     case 'vant': S.ui.vant = !S.ui.vant; render(); break;
+    case 'faq': S.ui.faq = S.ui.faq || {}; S.ui.faq[x] = !S.ui.faq[x]; render(); break;
     case 'sugestao': if (!guardOnline()) break; var sg = D.sugs.filter(function (q) { return q.id === x; })[0]; if (sg) openModal({ kind: 'sugestao', draft: { id: sg.id, texto: sg.texto, status: sg.status, nota: sg.nota_interna || '' } }); break;
     case 'pickstatus': if (m) { m.draft.status = x; renderLayer(); } break;
     case 'dosugestao': doSugestao(); break;

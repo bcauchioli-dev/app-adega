@@ -7,6 +7,16 @@
   ],
   "versoes": [
     {
+      "versao": "1.10.0",
+      "data": "2026-11-16",
+      "titulo": "Excluir lançamento errado",
+      "mudancas": [
+        "O dono da adega pode excluir uma garrafa ou um rótulo cadastrado por engano, pelo fim da ficha do vinho.",
+        "A exclusão pede o motivo e uma confirmação, e dá para desfazer logo em seguida.",
+        "Nada é apagado de vez: o histórico fica guardado e o item pode ser restaurado."
+      ]
+    },
+    {
       "versao": "1.9.1",
       "data": "2026-11-16",
       "titulo": "Reforço de segurança",

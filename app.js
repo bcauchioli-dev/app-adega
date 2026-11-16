@@ -3,7 +3,7 @@
 (function () {
 'use strict';
 
-var VERSION = '1.9.1';
+var VERSION = '1.10.0';
 var CFG = window.APP_CONFIG || {};
 var YEAR = new Date().getFullYear();
 var STYLE_ORDER = ['tinto', 'branco', 'rosé', 'espumante', 'doce/fortificado'];
@@ -86,6 +86,8 @@ var MSG = {
   sem_permissao: 'Seu acesso não permite editar este item.',
   produto_inexistente: 'Este item não foi encontrado.',
   campo_nao_permitido: 'Campo não permitido.',
+  motivo_obrigatorio: 'Escreva o motivo da exclusão (até 280 letras).',
+  restaurar_nicho_ocupado: 'Não dá para restaurar agora: o nicho onde a garrafa estava já recebeu outra. Mova a outra garrafa e tente de novo.',
   nicho_ocupado: 'Não dá para desfazer: o nicho já recebeu outra garrafa. A garrafa continua como consumida.',
   sugestao_invalida: 'Escreva a sugestão (de 3 a 2.000 letras).',
   sugestao_limite: 'Muitas sugestões seguidas. Tente de novo mais tarde.',
@@ -471,7 +473,7 @@ if (mq && mq.addEventListener) mq.addEventListener('change', function () { if (P
 var WIDE = window.matchMedia ? window.matchMedia('(min-width: 960px)') : null;
 function isWide() { return !!(WIDE && WIDE.matches); }
 if (WIDE && WIDE.addEventListener) WIDE.addEventListener('change', function () { render(); });
-var DEPTH = { home: 0, vinhos: 0, bar: 0, painel: 0, grupo: 1, busca: 1, historico: 1, noticias: 1, consumidos: 1, sugestoes: 1, ia: 1, tabela: 1, sobre: 1, ajuda: 1, vinho: 2 };
+var DEPTH = { home: 0, vinhos: 0, bar: 0, painel: 0, grupo: 1, busca: 1, historico: 1, noticias: 1, consumidos: 1, sugestoes: 1, ia: 1, tabela: 1, excluidos: 1, sobre: 1, ajuda: 1, vinho: 2 };
 function parseHash() {
   var h = location.hash.replace(/^#\/?/, '');
   var parts = h ? h.split('/').map(function (x) { try { return decodeURIComponent(x); } catch (e) { return x; } }) : [];
@@ -486,6 +488,7 @@ function parseHash() {
     case 'sugestoes': return { name: 'sugestoes' };
     case 'ia': return { name: 'ia' };
     case 'tabela': return { name: 'tabela' };
+    case 'excluidos': return { name: 'excluidos' };
     case 'sobre': return { name: 'sobre' };
     case 'ajuda': return { name: 'ajuda' };
     case 'g': return { name: 'grupo', modo: parts[1] || 'pais', chave: parts.slice(2).join('/'), secao: parts[1] === 'cat' ? 'bar' : null };
@@ -714,7 +717,7 @@ function loadAdega(id) {
   ]).then(function (r) {
     if (id !== S.adegaId) return;
     applyAdegaData({ produtos: r[0], garrafas: r[1], locais: r[2], movs: r[3], alts: r[4], nomes: r[5], membros: r[6], noticias: r[7], cons: r[8] });
-    D.sugs = r[9] || []; D.ia = r[10] || [];
+    D.sugs = r[9] || []; D.ia = (r[10] || []).filter(function (x) { return D.produtos.has(x.produto_id); });   // sugestão de rótulo excluído não conta
     S.ui.syncedAt = new Date().toISOString(); S.ui.offline = false;
     snapshot();
     signPhotos();
@@ -1079,6 +1082,7 @@ function viewFicha(id) {
       ? '<a class="link" href="#/ia" style="align-self:flex-start">' + plural(D.ia.filter(function (x) { return x.produto_id === id; }).length, 'sugestão da IA', 'sugestões da IA') + ' para aprovar</a>'
       : '<button class="link" type="button" data-a="pediria" data-x="' + id + '" style="align-self:flex-start">Pedir sugestões da IA</button>') : '') + '</section>' +
     '<section class="sec"><h2>Histórico</h2>' + hist + '</section>' +
+    (canManage() ? '<section class="sec"><button class="link" type="button" data-a="excluir" data-x="' + id + '" style="align-self:flex-start;color:var(--wine-fg)">Excluir garrafa ou rótulo</button></section>' : '') +
     (!canWrite() ? '<p class="hint" style="padding:var(--space-2) 0 var(--space-5)">Seu acesso é somente de consulta.</p>' : '') + '</main>';
 }
 function fichaActions(id) {
@@ -1434,6 +1438,29 @@ function tbSave(el) {
   });
 }
 
+/* ---------- excluídos (só o administrador restaura) ---------- */
+function loadExcluidos() {
+  if (S.exclBusy) return; S.exclBusy = true;
+  var a = S.adegaId;
+  API.rpc('excluidos_da_adega', { p_adega: a }).then(function (rows) { S.excl = { adega: a, rows: rows || [] }; }, function (e) { S.excl = { adega: a, erro: (e && e.message) || 'Tente de novo em instantes.' }; })
+    .then(function () { S.exclBusy = false; if (S.route.name === 'excluidos') render(); });
+}
+function viewExcluidos() {
+  var head = topBar(btnBack('#/'), 'Excluídos', (adegaAtual() || {}).nome, '', true);
+  if (!(S.me && S.me.is_admin)) return head + '<main class="wrap content">' + emptyState('Área do administrador', 'Para recuperar algo excluído, fale com quem administra o app.') + '</main>';
+  var x = S.excl;
+  if (!x || x.adega !== S.adegaId) { loadExcluidos(); return head + '<main class="wrap content">' + skeletonRows(3) + '</main>'; }
+  if (x.erro) return head + '<main class="wrap content">' + emptyState('Não deu para carregar', x.erro) + '</main>';
+  if (!x.rows.length) return head + '<main class="wrap content">' + emptyState('Nada excluído', 'Garrafas e rótulos excluídos nesta adega aparecem aqui, para restaurar.') + '</main>';
+  return head + '<main class="wrap content"><div class="nlist">' + x.rows.map(function (r) {
+    var busy = S.busy === 'rest:' + r.id;
+    return '<article class="news" data-k="ex:' + esc(r.id) + '"><span class="src">' + esc(r.tipo === 'rotulo' ? 'Rótulo inteiro · ' + plural(r.garrafas, 'garrafa', 'garrafas') : 'Uma garrafa' + (r.local ? ' · estava em ' + r.local : ' · sem local')) + '</span>' +
+      '<h3>' + esc(r.nome) + (r.safra ? ' ' + esc(r.safra) : '') + '</h3><p>Motivo: ' + esc(r.motivo || '—') + '</p>' +
+      '<p class="hint">' + esc('Excluído por ' + (r.quem || 'alguém sem nome') + ' em ' + fmtDate(r.excluido_em)) + '</p>' +
+      '<div class="nact"><button class="btn small" type="button" data-a="restaurar" data-x="' + esc(r.tipo + ':' + r.id) + '"' + (S.busy ? ' disabled' : '') + '>' + (busy ? '<span class="spin" aria-hidden="true"></span>' : '') + 'Restaurar</button></div></article>';
+  }).join('') + '</div></main>';
+}
+
 /* ---------- sobre o app ---------- */
 function loadVersoes() {
   if (S.versoes || S.versoesBusy) return; S.versoesBusy = true;
@@ -1548,6 +1575,26 @@ function modalHtml(m) {
   var p = m.pid ? prod(m.pid) : null, d = m.draft;
   if (m.kind === 'menu') return menuHtml();
   if (m.kind === 'foto') return fotoHtml(m);
+  if (m.kind === 'excluir') {
+    var egs = stock(m.pid), egr = locGroups(egs), rot = d.alvo === 'rotulo' || !egs.length;
+    if (!rot && !d.loc && egr.length === 1) d.loc = egr[0].key;
+    var eg = egr.filter(function (g) { return g.key === d.loc; })[0];
+    if (m.step === 'conf') {
+      return sheetOpen('Confirmar exclusão') + '<h2>' + (rot ? 'Excluir o rótulo inteiro?' : 'Excluir esta garrafa?') + '</h2>' +
+        '<p class="lead">' + (rot ? 'O rótulo e as garrafas dele saem das listas e das contagens.' : 'A garrafa sai das listas e das contagens, e o lugar dela fica livre.') + ' O histórico fica guardado, e quem administra o app consegue restaurar.</p>' +
+        summary(p, [safra(p), rot ? plural(egs.length, 'garrafa', 'garrafas') : (eg ? 'sai ' + deLoc(eg.L) : '')].filter(Boolean).join(' · ')) +
+        '<dl class="conf"><dt>O que sai</dt><dd>' + (rot ? 'Rótulo inteiro, com ' + plural(egs.length, 'garrafa', 'garrafas') : 'Uma garrafa') + '</dd>' +
+        '<dt>De onde</dt><dd>' + esc(rot ? (egs.length ? locLabel(egs, true) : '—') : (eg ? locName(eg.L) : '—')) + '</dd>' +
+        '<dt>Motivo</dt><dd>' + esc(d.motivo) + '</dd><dt>Registrado por</dt><dd>' + esc(meuNome()) + '</dd></dl>' +
+        errLine(m) + '<div class="stack-btn">' + busyBtn('doexcluir', rot ? 'Excluir rótulo' : 'Excluir garrafa', 'Excluindo…', 'danger') + '<button class="btn block" type="button" data-a="step" data-x="form">Voltar e corrigir</button></div>' + SHEET_END;
+    }
+    return sheetOpen('Excluir') + sheetHd('Excluir') + summary(p, [safra(p), plural(egs.length, 'garrafa', 'garrafas') + ' em estoque'].filter(Boolean).join(' · ')) +
+      (egs.length ? '<div class="fld"><span>O que excluir?</span>' + pickRow('pickalvo', [['garrafa', 'Uma garrafa'], ['rotulo', 'O rótulo inteiro']], rot ? 'rotulo' : 'garrafa') + '</div>' : '') +
+      (!rot && egr.length > 1 ? '<div class="fld"><span>Qual garrafa?</span>' + pickRow('pickloc', egr.map(function (g) { return [g.key, locName(g.L) + (g.gs.length > 1 ? ' · ' + g.gs.length : '')]; }), d.loc) + '</div>' : '') +
+      '<label class="fld">Motivo<textarea data-f="motivo" rows="2" maxlength="280" placeholder="Ex.: lancei uma garrafa a mais">' + esc(d.motivo || '') + '</textarea></label>' +
+      '<p class="hint">Use para corrigir lançamento errado. Garrafa que foi aberta se registra em “Abrir uma garrafa”.</p>' +
+      errLine(m) + '<button class="btn primary block" type="button" data-a="revisar">Revisar</button>' + SHEET_END;
+  }
   if (m.kind === 'consumir') {
     var gs = stock(m.pid), groups = locGroups(gs);
     if (!d.loc && groups.length === 1) d.loc = groups[0].key;
@@ -1734,7 +1781,8 @@ function menuHtml(side) {
       (canManage() ? '<button class="dlink" type="button" data-a="pessoas"><span>Pessoas com acesso</span><small>' + plural(D.membros.length, 'pessoa', 'pessoas') + '</small></button>' : '') +
       (S.me && S.me.is_admin ? '<a class="dlink" href="#/ia"><span>Sugestões da IA</span>' + (D.ia.length ? '<span class="cnt">' + D.ia.length + '</span>' : '') + '</a>' +
         '<a class="dlink" href="#/tabela"><span>Edição em massa</span></a>' +
-        '<a class="dlink" href="#/sugestoes"><span>Sugestões recebidas</span>' + (sgNovas ? '<span class="cnt">' + sgNovas + '</span>' : '') + '</a>' : '') +
+        '<a class="dlink" href="#/sugestoes"><span>Sugestões recebidas</span>' + (sgNovas ? '<span class="cnt">' + sgNovas + '</span>' : '') + '</a>' +
+        '<a class="dlink" href="#/excluidos"><span>Excluídos</span></a>' : '') +
       (S.me && S.me.is_admin ? '<button class="dlink" type="button" data-a="fotoslote"><span>Importar fotos do AppSheet</span>' + I.img + '</button>' : '') +
     '</div>' +
     '<div class="dsec"><span class="lbl">Aparência</span>' + seg('theme', [['system', 'Sistema'], ['dark', 'Escuro'], ['light', 'Claro']], th) + '</div>' +
@@ -1805,6 +1853,7 @@ function render() {
     else if (lr.name === 'sugestoes') html = viewSugestoes();
     else if (lr.name === 'ia') html = viewIA();
     else if (lr.name === 'tabela') html = viewTabela();
+    else if (lr.name === 'excluidos') html = viewExcluidos();
     else if (lr.name === 'sobre') html = viewSobre();
     else if (lr.name === 'ajuda') html = viewAjuda();
     else html = viewHome();
@@ -1889,6 +1938,11 @@ function labelNichos(ns) { if (ns.length === 1) return 'Nicho ' + pad(ns[0]); re
 function revisar() {
   var m = S.modal, d = m.draft, p = m.pid ? prod(m.pid) : null;
   m.err = null;
+  if (m.kind === 'excluir') {
+    if (d.alvo !== 'rotulo' && stock(m.pid).length && !d.loc) { m.err = 'Escolha qual garrafa sai.'; return renderLayer(); }
+    if (String(d.motivo || '').trim().length < 3) { m.err = 'Escreva o motivo da exclusão.'; return renderLayer(); }
+    m.step = 'conf'; return renderLayer({ step: true });
+  }
   if (m.kind === 'consumir') {
     if (!d.loc) { m.err = 'Escolha de onde sai a garrafa.'; return renderLayer(); }
     if (d.data && d.data > todayISO()) { m.err = 'A data não pode ser no futuro.'; return renderLayer(); }
@@ -1972,6 +2026,33 @@ function desfazer(mov, g, prevLocal) {
     var pid = g.produto_id; if (S.ficha[pid]) S.ficha[pid].movs.unshift(nm);
     render(); snapshot(); toast('Desfeito.'); refreshResumo();
   }).catch(function (e) { fail(e); });
+}
+// Exclusão (v1.10): nada é apagado; o banco marca e esconde, e o administrador restaura.
+function restaurarItem(tipo, id) {
+  return API.rpc(tipo === 'rotulo' ? 'restaurar_produto' : 'restaurar_garrafa', tipo === 'rotulo' ? { p_produto: id } : { p_garrafa: id })
+    .then(function () { return loadAdega(S.adegaId); }).then(function () { S.excl = null; refreshResumo(); });
+}
+function doExcluir() {
+  var m = S.modal, d = m.draft, p = prod(m.pid), pid = m.pid;
+  var rot = d.alvo === 'rotulo' || !stock(pid).length, g = rot ? null : pickGarrafa(pid, d.loc);
+  if (!rot && !g) { m.err = MSG.garrafa_indisponivel; return renderLayer(); }
+  var nome = p.nome, lista = p.secao === 'bar' ? '#/bar' : '#/vinhos', motivo = String(d.motivo || '').trim();
+  return run('doexcluir', function () {
+    return (rot ? API.rpc('excluir_produto', { p_produto: pid, p_motivo: motivo }) : API.rpc('excluir_garrafa', { p_garrafa: g.id, p_motivo: motivo }))
+      .then(function () { return loadAdega(S.adegaId); }).then(function () {
+        S.excl = null; delete S.ficha[pid]; refreshResumo();
+        if (rot) leaveModal(function () { go(lista); }); else { closeModal(); render(); loadFicha(pid); }
+        toast((rot ? 'Rótulo excluído: ' : 'Garrafa excluída: ') + nome + '.', { action: { label: 'Desfazer', run: function () {
+          if (!guardOnline()) return;
+          restaurarItem(rot ? 'rotulo' : 'garrafa', rot ? pid : g.id).then(function () { render(); loadFicha(pid); toast('Desfeito.'); }).catch(function (e) { fail(e); });
+        } } });
+      });
+  });
+}
+function doRestaurar(x) {
+  var i = String(x).indexOf(':'), tipo = x.slice(0, i), id = x.slice(i + 1);
+  var pr = run('rest:' + id, function () { return restaurarItem(tipo, id).then(function () { toast('Restaurado.'); }); });
+  render(); if (pr) pr.then(render);
 }
 function doMover() {
   var m = S.modal, d = m.draft, g = pickGarrafa(m.pid, d.loc);
@@ -2318,6 +2399,10 @@ document.addEventListener('click', function (ev) {
     case 'etype': if (m) { m.draft.bar = x === '1'; m.sugF = null; renderLayer(); } break;
     case 'qty': if (m) { m.draft.qtd = Math.max(1, Math.min(120, (m.draft.qtd || 1) + (+x))); renderLayer(); } break;
     case 'doconsumir': doConsumir(); break;
+    case 'excluir': if (!canManage() || !guardOnline()) break; openModal({ kind: 'excluir', pid: x, draft: { alvo: stock(x).length ? 'garrafa' : 'rotulo' } }); break;
+    case 'pickalvo': if (m) { m.draft.alvo = x; m.err = null; renderLayer(); } break;
+    case 'doexcluir': doExcluir(); break;
+    case 'restaurar': doRestaurar(x); break;
     case 'domover': doMover(); break;
     case 'doeditar': doEditar(); break;
     case 'doentrada': doEntrada(); break;

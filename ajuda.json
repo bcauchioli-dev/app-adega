@@ -92,6 +92,14 @@
           "r": ["Na ficha do vinho, toque em “Editar”. Dá para ajustar avaliação, janela de consumo e notas; em “Nome, produtor, safra e origem” ficam os outros campos."]
         },
         {
+          "p": "Cadastrei uma garrafa ou um vinho por engano. Como excluo?",
+          "r": [
+            "No fim da ficha do vinho, toque em “Excluir garrafa ou rótulo”. Escolha se sai uma garrafa ou o rótulo inteiro, escreva o motivo, revise e confirme.",
+            "Logo depois aparece um aviso com o botão “Desfazer”. Passado esse momento, quem administra o app consegue restaurar: nada é apagado de vez.",
+            "Só quem é dono da adega vê essa opção. Garrafa que foi aberta não se exclui: registre em “Abrir uma garrafa”."
+          ]
+        },
+        {
           "p": "Onde vejo o que já foi aberto?",
           "r": ["Em Menu › Consumidos, do mais recente ao mais antigo, com a data, quem registrou e de onde a garrafa saiu. O Histórico mostra também entradas, mudanças de lugar e edições."]
         },

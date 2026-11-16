@@ -3,7 +3,7 @@
 (function () {
 'use strict';
 
-var VERSION = '1.9.0';
+var VERSION = '1.9.1';
 var CFG = window.APP_CONFIG || {};
 var YEAR = new Date().getFullYear();
 var STYLE_ORDER = ['tinto', 'branco', 'rosé', 'espumante', 'doce/fortificado'];
@@ -1322,7 +1322,7 @@ function iaTexto(x, p) {
   if (x.campo === 'pontuacao') return ['Pontuação', esc(v.nota + ' · ' + v.fonte)];
   if (x.campo === 'janela') return ['Janela de consumo', esc((v.inicio || '?') + '–' + (v.fim || '?')) + ' <span class="hint">hoje: ' + (p.janela_inicio || p.janela_fim ? esc((p.janela_inicio || '?') + '–' + (p.janela_fim || '?')) : 'sem janela') + '</span>'];
   if (x.campo === 'nome' || x.campo === 'produtor') return [x.campo === 'nome' ? 'Nome' : 'Produtor', esc(v.texto || '') + ' <span class="hint">hoje: ' + esc(p[x.campo] || 'vazio') + '</span>'];
-  return [x.campo, esc(JSON.stringify(v))];
+  return [esc(x.campo), esc(JSON.stringify(v))];
 }
 function viewIA() {
   var head = topBar(btnBack('#/'), 'Sugestões da IA', (adegaAtual() || {}).nome, '', true);
